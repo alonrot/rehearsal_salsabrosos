@@ -61,7 +61,6 @@
     border-top:1px solid var(--line);
     user-select:none; -webkit-user-select:none;
   }
-  #vp.editing{box-shadow:inset 0 0 0 2px var(--sel);}
   #vp>div{position:absolute; will-change:transform;}
   #corner{left:0; top:0; width:var(--tw); height:var(--hh); z-index:3;
     background:var(--bg); border-right:1px solid var(--line2); border-bottom:1px solid var(--line2);}
@@ -177,7 +176,7 @@ const CONFIG = {
   defaultDaysVisible: 8,     // default view: 8 columns ...
   defaultHoursVisible: 14,   // ... and the whole 9am-11pm vertically
   zoomInDaysCap: 6,          // pinch in  -> at most 6 days across
-  zoomOutDaysCap: 11,        // pinch out -> at most 11 days across
+  zoomOutDaysCap: 9,         // pinch out -> at most 9 days across
   // LOCAL is computed just above: no editing this file between environments.
   apiBase: LOCAL ? "" : EXEC_URL,
   pollMs:  LOCAL ? 2000 : 8000   // Apps Script has daily quotas; don't poll it hard
