@@ -11,3 +11,8 @@ __pycache__/
 # editors
 .vscode/
 .idea/
+
+# one-off import: contains bandmates' names + availability, and this repo is public
+import_whenitworks.gs
+availability_whenitworks.html
+*whenitworks*
