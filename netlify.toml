@@ -8,3 +8,12 @@
   for = "/index.html"
   [headers.values]
     Cache-Control = "no-cache"
+
+# The logo and maracas are now real files rather than inline base64, so they
+# can actually be cached. 30 days: they change almost never, and the page is
+# opened repeatedly on phones. If you DO change one, rename the file
+# (logo-v2.png) or the old one will stick around in people's browsers.
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"

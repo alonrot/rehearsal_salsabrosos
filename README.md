@@ -10,7 +10,8 @@ so the best slot is obvious. Replaces when2meet.
 
 | file | what it is |
 |---|---|
-| `index.html` | the whole app — HTML, CSS, JS, logo as inline base64. No build step. |
+| `index.html` | the whole app — HTML, CSS and JS in one file. No build step. |
+| `logo.png`, `maracas.png` | the images, served as real cacheable files (30-day cache) |
 | `rehearsal.html` | working copy; `./sync.sh` copies it over `index.html` before a commit |
 | `server.py` | local dev server — the stand-in for the Apps Script backend |
 | `gigs.json` | local mirror of the Sheet's `gigs` tab (dev only) |
