@@ -1,0 +1,11 @@
+# local dev state — the real data lives in the Google Sheet
+responses.json
+*.tmp
+*.tmp.*
+
+# macOS
+.DS_Store
+
+# editors
+.vscode/
+.idea/

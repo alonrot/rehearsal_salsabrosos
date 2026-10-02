@@ -1,0 +1,10 @@
+# Static site: no build step, everything is served from the repo root.
+[build]
+  publish = "."
+
+# index.html is plain HTML+JS with no bundler, so never let a browser
+# or CDN serve a stale copy after a push.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
