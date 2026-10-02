@@ -72,8 +72,10 @@
   .dh span{font-size:11px; color:var(--faint);}
   #timecol{left:0; top:var(--hh); width:var(--tw); z-index:2;
     background:var(--bg); border-right:1px solid var(--line2);}
-  .tl{height:var(--rh); font-size:11px; color:var(--dim); text-align:right;
-      padding:2px 8px 0 0; font-variant-numeric:tabular-nums; overflow:hidden;}
+  /* rows can be ~12px tall now that the default view spans all of 9am-11pm,
+     so the label has to fit in that: 10px text + 1px padding + line-height 1. */
+  .tl{height:var(--rh); font-size:10px; line-height:1; color:var(--dim); text-align:right;
+      padding:1px 8px 0 0; font-variant-numeric:tabular-nums; overflow:hidden;}
   .tl.half{color:transparent;}
   #cells{left:var(--tw); top:var(--hh); z-index:1; display:grid;}
   .c{
@@ -172,9 +174,10 @@ const CONFIG = {
     "2026-10-28","2026-10-31","2026-11-01"
   ],
   startHour: 9, endHour: 23, slotMinutes: 30,
-  defaultDaysVisible: 5,     // default view: 5 columns ...
-  defaultHoursVisible: 9,    // ... and 9am-6pm vertically
-  zoomInDaysCap: 4,          // can't zoom in past ~4 visible days
+  defaultDaysVisible: 8,     // default view: 8 columns ...
+  defaultHoursVisible: 14,   // ... and the whole 9am-11pm vertically
+  zoomInDaysCap: 6,          // pinch in  -> at most 6 days across
+  zoomOutDaysCap: 11,        // pinch out -> at most 11 days across
   // LOCAL is computed just above: no editing this file between environments.
   apiBase: LOCAL ? "" : EXEC_URL,
   pollMs:  LOCAL ? 2000 : 8000   // Apps Script has daily quotas; don't poll it hard
@@ -283,10 +286,14 @@ let panX=0, panY=0;
 const rowsDefault = CONFIG.defaultHoursVisible*60/CONFIG.slotMinutes;
 
 function zBounds(){
-  const fitAllRows = (vpH-HH)/(NR*RH0);                     // zoom-out cap: whole time scale
-  const zMin = Math.min(1, Math.max(fitAllRows, 34/CW0, 11/RH0, 0.3));
-  const zMax = CONFIG.defaultDaysVisible/CONFIG.zoomInDaysCap; // zoom-in cap: ~4 days
-  return [zMin, zMax];
+  // Visible days = defaultDaysVisible / Z, so both caps are plain ratios.
+  // (The old cap was "stop when all rows fit". That is useless now the default
+  //  view already spans the whole 9am-11pm: it computes to exactly Z=1 and
+  //  would block zooming out at all.)
+  const zOut    = CONFIG.defaultDaysVisible/CONFIG.zoomOutDaysCap;  // most zoomed out
+  const zIn     = CONFIG.defaultDaysVisible/CONFIG.zoomInDaysCap;   // most zoomed in
+  const legible = Math.max(29/CW0, 9/RH0);         // never shrink cells past this
+  return [Math.min(1, Math.max(zOut, legible)), Math.max(1, zIn)];
 }
 function setSizes(){
   CW = CW0*Z; RH = RH0*Z;
@@ -295,8 +302,8 @@ function setSizes(){
 }
 function layout(){
   const r = vp.getBoundingClientRect(); vpW=r.width; vpH=r.height;
-  CW0 = Math.max(58, (vpW-TW)/CONFIG.defaultDaysVisible);
-  RH0 = Math.max(20, (vpH-HH)/rowsDefault);
+  CW0 = Math.max(40, (vpW-TW)/CONFIG.defaultDaysVisible);   // 58 here capped a phone at ~6 days
+  RH0 = Math.max(12, (vpH-HH)/rowsDefault);   // 20 here hid the evening behind a pan
   const [a,b]=zBounds(); Z=Math.min(b,Math.max(a,Z));
   setSizes(); clampPan(); applyPan();
 }
