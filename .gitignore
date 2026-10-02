@@ -2,6 +2,8 @@
 responses.json
 *.tmp
 *.tmp.*
+__pycache__/
+*.pyc
 
 # macOS
 .DS_Store
