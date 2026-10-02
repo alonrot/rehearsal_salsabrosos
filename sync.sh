@@ -3,6 +3,6 @@
 # Run this before committing, so the deployed page matches what you tested locally.
 set -e
 cd "$(dirname "$0")"
-cp ../rehearsal.html index.html
-echo "index.html updated from ../rehearsal.html"
+cp rehearsal.html index.html
+echo "index.html updated from rehearsal.html"
 git --no-pager diff --stat index.html || true
