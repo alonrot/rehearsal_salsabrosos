@@ -43,28 +43,27 @@ The last choice is remembered in `localStorage`.
   still missing. Blank is fine — the buttons then build themselves from whoever
   has answered.
 
-## Who are you?
+## Who are you? / seeing one person's slots
 
-Nobody types their name twice. The page shows a button per known person; tapping
-one loads that person's saved grid, and the row collapses to a single chip
-afterwards (remembered per gig in `localStorage`). The free-text field is hidden
-behind **+ I'm new**.
+The name row is always visible and is the only view control — there is no Me/Everyone
+toggle.
 
-Typing is still possible, and guarded: a name that differs only by case resolves
-silently to the existing one, and a near-match (`anu` when `Anushka S` exists,
-or a second `John`) asks *"is that you?"* with an explicit way to say no. It
-never merges two people on its own, and Submit is disabled until that question is
-answered.
+- **Tap a name** → that chip highlights, everyone else stays plain, and the grid shows
+  that person's slots, read-only.
+- **Tap another name** → switches straight to them.
+- **Tap the highlighted name again** → deselects, back to everyone's heat map.
+- **Edit availability** (bottom, only when someone is selected) → edit mode. The buttons
+  become **Submit** and **Discard**, and the name chips freeze so a stray tap can't swap
+  person mid-paint. Discard restores their saved grid and stays on them.
 
-Tapping a name also *shows* that person's slots straight away, read-only — painting
-needs edit mode, which only the main button turns on. The ✕ at the bottom right
-leaves that view and restores their saved grid, so backing out can never half-change
-someone's answer. This is what stopped `Skye Ocaranza` and `Skye` becoming two rows.
+Painting is gated on edit mode, so simply viewing someone can never change their answer.
+Nothing is remembered between visits: every load starts on the group overlay, so you
+can't accidentally submit as the last person you were looking at.
 
-**Adding a gig is one new row.** No code change, no deploy. Responses for it land in a
-new tab named after the `id`, created on the first submission.
-
-For local testing, mirror the same gig into `gigs.json`.
+Typing is still available behind **+ I'm new**, and guarded: a name differing only by
+case resolves silently to the existing one, and a near-match (`anu` when `Anushka S`
+exists, or a second `John`) asks *"is that you?"* with an explicit way to say no. It
+never merges two people on its own, and Submit is disabled until that is answered.
 
 ## The two backends
 

@@ -75,6 +75,7 @@
   #whorow button.me{background:var(--accent); color:#fff; border-color:var(--accent);}
   #whorow button.pending{opacity:.55; border-style:dashed;}   /* on the list, not answered yet */
   #whorow button.add{color:var(--ink); border-style:dashed;}
+  #whorow.locked button{opacity:.4; pointer-events:none;}
   #whorow .chg{font-size:12px; color:var(--faint); text-decoration:underline;}
   #whook{flex:none; padding:9px 14px; border:0; border-radius:11px; background:var(--accent);
          color:#fff; font-size:14px; font-weight:650; font-family:inherit;}
@@ -88,12 +89,6 @@
   /* an author display: rule beats the [hidden] attribute, so say it explicitly */
   #nmatch[hidden], #who[hidden], #whook[hidden]{display:none;}
 
-  #views{display:flex; flex:none; margin-left:auto; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; gap:3px;}
-  #views button{
-    padding:7px 12px; border:0; border-radius:999px; background:transparent;
-    color:var(--dim); font-size:13px; font-weight:600; font-family:inherit; white-space:nowrap;
-  }
-  #views button[aria-pressed=true]{background:var(--accent); color:#fff;}
   .hint{margin:7px 0 0; font-size:12px; color:var(--faint); display:flex; justify-content:space-between; gap:8px;}
   #sync{flex:none;}
   #sync.bad{color:#e8a53c;}
@@ -153,10 +148,10 @@
     font-size:15.5px; font-weight:650; font-family:inherit; background:var(--accent); color:#fff;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   #mainbtn:disabled{background:#222c4d; color:var(--faint);}
-  #exitbtn{flex:none; margin-left:auto; width:46px; height:46px; padding:0; border:1px solid var(--line2);
+  #discardbtn{flex:none; margin-left:auto; padding:13px 16px; border:1px solid var(--line2);
     border-radius:12px; background:var(--panel); color:var(--dim);
-    font-size:17px; font-family:inherit; line-height:1;}
-  #exitbtn[hidden]{display:none;}
+    font-size:15px; font-weight:600; font-family:inherit; white-space:nowrap;}
+  #mainbtn[hidden], #discardbtn[hidden]{display:none;}
   /* Fills the grid area while the gig list loads, and doubles as the no-JS
      fallback. position/inset are needed because #vp>div makes it absolute with
      no box, and z-index must beat #corner (3) or that top-left block paints
@@ -187,10 +182,6 @@
       <img id="maracas" alt="" src="maracas.png" width="94" height="72">
       <input type="text" id="who" placeholder="Your name" autocomplete="off" autocapitalize="words" enterkeyhint="done" hidden>
       <button id="whook" type="button" hidden>OK</button>
-      <div id="views">
-        <button id="vMe" aria-pressed="false">Me</button>
-        <button id="vGroup" aria-pressed="true">Everyone</button>
-      </div>
     </div>
     <div id="nmatch" hidden></div>
     <p class="hint"><span id="hint"></span><span id="sync"></span></p>
@@ -210,8 +201,8 @@
 
   <div id="bot">
     <span id="count"></span>
-    <button id="mainbtn" disabled>…</button>
-    <button id="exitbtn" type="button" aria-label="Back to everyone" hidden>✕</button>
+    <button id="mainbtn" hidden>…</button>
+    <button id="discardbtn" type="button" hidden>Discard</button>
   </div>
 </div>
 
@@ -529,47 +520,40 @@ function showNameInput(on){
   if (on){ $("who").value = ""; refreshBar(); $("who").focus(); }
 }
 
-function selectIdentity(name, show){
+function selectIdentity(name){
   picked = name;
   pendingConfirm = false;
-  remember("who:" + (CONFIG.gigId || ""), name);
   $("who").value = name;
-  $("who").dispatchEvent(new Event("input"));     // reuse the existing load-my-grid path
+  $("who").dispatchEvent(new Event("input"));   // reuse the existing load-their-grid path
   showNameInput(false);
   renderWho();
-  // A deliberate tap jumps straight to that person's slots (read-only - painting
-  // needs `editing`, which only the main button sets). Restoring a remembered
-  // identity on load passes show=false, so you still land on the group overlay.
-  if (show && findResp(norm(name))) setView("me");
+  setView("me");                                 // read-only: painting needs `editing`
 }
 
 function renderWho(){
   const row = $("whorow");
-  if (editing) return;                            // don't reshuffle under someone mid-edit
+  if (editing) return;                      // frozen while painting
   row.innerHTML = "";
 
-  if (picked){                                    // collapsed: hand the space back to the grid
-    const b = document.createElement("button");
-    b.className = "me"; b.textContent = picked;
-    // tapping the person shows their slots again; "not you?" is how you switch
-    b.onclick = () => { if (findResp(norm(picked))) setView("me"); };
-    const c = document.createElement("span");
-    c.className = "chg"; c.textContent = "not you?";
-    c.onclick = () => { picked = ""; renderWho(); };
-    row.append(b, c);
-    return;
-  }
+  const people = knownPeople();
+  if (picked && !people.some(x => nkey(x.name) === nkey(picked)))
+    people.push({ name: picked, pending: true });   // typed just now, not submitted yet
 
   const l = document.createElement("p");
-  l.className = "lbl"; l.textContent = "Who are you?";
+  l.className = "lbl";
+  l.textContent = picked ? "Showing " + picked + " \u00b7 tap again for everyone"
+                         : "Tap a name to see their slots";
   row.appendChild(l);
-  knownPeople().forEach(pp => {
+
+  people.forEach(pp => {
     const b = document.createElement("button");
     b.textContent = pp.name;
-    if (pp.pending) b.className = "pending";
-    b.onclick = () => selectIdentity(pp.name, true);
+    const on = picked && nkey(pp.name) === nkey(picked);
+    b.className = on ? "me" : (pp.pending ? "pending" : "");
+    b.onclick = () => on ? deselect() : selectIdentity(pp.name);
     row.appendChild(b);
   });
+
   const add = document.createElement("button");
   add.className = "add"; add.textContent = "+ I'm new";
   add.onclick = () => showNameInput(true);
@@ -581,10 +565,10 @@ function commitTypedName(){
   if (raw.length < 2) return;
   const k = nkey(raw), people = knownPeople();
   const exact = people.find(x => nkey(x.name) === k);
-  if (exact) return selectIdentity(exact.name, true);             // same person, canonical spelling
+  if (exact) return selectIdentity(exact.name);             // same person, canonical spelling
   const near = people.filter(x => looksLikeSameName(k, nkey(x.name)));
   if (near.length) return askNearMatch(raw, near);
-  selectIdentity(raw, true);
+  selectIdentity(raw);
 }
 
 function askNearMatch(typed, near){
@@ -598,13 +582,13 @@ function askNearMatch(typed, near){
   near.forEach(n => {
     const b = document.createElement("button");
     b.textContent = "Yes, I'm " + n.name;
-    b.onclick = () => { el.hidden = true; selectIdentity(n.name, true); };
+    b.onclick = () => { el.hidden = true; selectIdentity(n.name); };
     el.appendChild(b);
   });
   const no = document.createElement("button");
   no.className = "ghost";
   no.textContent = "No \u2014 I'm " + typed;
-  no.onclick = () => { el.hidden = true; selectIdentity(typed, true); };
+  no.onclick = () => { el.hidden = true; selectIdentity(typed); };
   el.appendChild(no);
   el.hidden = false;
   pendingConfirm = true;
@@ -620,41 +604,46 @@ function setView(v){
   if (editing && v!=="me") stopEditing();
   view = v;
   document.body.className = v;
-  $("vMe").setAttribute("aria-pressed", v==="me");
-  $("vGroup").setAttribute("aria-pressed", v==="group");
-  $("exitbtn").hidden = v!=="me";
   hideTip(); renderCells(); refreshBar(); setHint();
 }
 function startEditing(){
   if (norm($("who").value).length<2) return;
   editing = true; gridDirty = true;         // lock out poll reloads while editing
   vp.classList.add("editing");
+  $("whorow").classList.add("locked");      // no swapping person mid-paint
   setView("me");
 }
 function stopEditing(){
   editing = false;
   vp.classList.remove("editing");
+  $("whorow").classList.remove("locked");
   setHint();
 }
-/* Leave one person's grid without submitting. Any unsaved painting is dropped and
-   the saved copy restored, so backing out can never half-change someone's answer. */
+/* Discard: drop any unsaved painting, restore the saved copy, stay on that person. */
 function exitMe(){
   if (editing){ editing = false; vp.classList.remove("editing"); }
+  $("whorow").classList.remove("locked");
   gridDirty = false; loadedFor = "";
   if (findResp(norm($("who").value))) maybeLoadMine(true); else clearSel();
-  setView("group");
+  setView("me");
+  renderWho();
 }
-$("exitbtn").onclick = exitMe;
 
-$("vMe").onclick    = ()=>setView("me");
-$("vGroup").onclick = ()=>setView("group");
+/* Untapping the selected name goes back to everyone's overlay. */
+function deselect(){
+  picked = "";
+  $("who").value = "";
+  loadedFor = ""; gridDirty = false; clearSel();
+  setView("group");
+  renderWho();
+}
+$("discardbtn").onclick = exitMe;
 
 function setHint(){
   $("hint").textContent =
     editing        ? "☝️ Paint your free slots · ✌️ Move / pinch" :
-    view==="group" ? "Brighter green = more people · Tap a slot to see who · Pinch to zoom" :
-                     (picked ? picked + "’s saved slots · ✕ to go back"
-                             : "Saved availability · ✕ to go back");
+    picked         ? picked + "’s saved slots" :
+                     "Brighter green = more people · Tap a slot to see who · Pinch to zoom";
 }
 function renderCells(){
   for (let r=0;r<NR;r++) for (let c=0;c<ND;c++){
@@ -675,23 +664,25 @@ function renderCells(){
 function refreshBar(){
   const b=$("mainbtn"), cnt=$("count");
   const named = norm($("who").value).length>1;
+  const d = $("discardbtn");
   if (pendingConfirm){            // don't let them submit under a name we just queried
-    cnt.textContent = "";
-    b.disabled = true;
-    b.textContent = "Confirm who you are";
+    cnt.textContent = ""; d.hidden = true;
+    b.hidden = false; b.disabled = true; b.textContent = "Confirm who you are";
     return;
   }
   if (editing){
     const total = sel.flat().filter(Boolean).length;
     cnt.textContent = total+" slot"+(total===1?"":"s");
-    b.disabled = !named;
-    b.textContent = !named ? "Enter your name first"
-      : total===0 ? "Submit — none of these work" : "Submit";
+    d.hidden = false;
+    b.hidden = false; b.disabled = !named;
+    b.textContent = total===0 ? "Submit — none work" : "Submit";
   } else {
     cnt.textContent = group.length+" response"+(group.length===1?"":"s");
+    d.hidden = true;
+    b.hidden = !picked;                       // nothing selected -> nothing to do
     b.disabled = !named;
-    b.textContent = !named ? "Enter your name to add yours"
-      : findResp(norm($("who").value)) ? "✏️ Edit my availability" : "＋ Add my availability";
+    b.textContent = findResp(norm($("who").value)) ? "✏️ Edit availability"
+                                                   : "＋ Add availability";
   }
 }
 
@@ -906,15 +897,13 @@ $("mainbtn").onclick = async () => {
     b.textContent="✓ Saved";
     groupStamp="";
     await fetchData();
-    setTimeout(()=>setView("group"), 350);
+    setTimeout(deselect, 350);
   }catch(err){
     setSync(false);
     b.disabled=false; b.textContent="Retry — couldn't reach server";
   }
 };
 
-picked = recall("who:" + (CONFIG.gigId || "")) || "";
-if (picked) $("who").value = picked;
 renderWho();
 
 layout(); setView("group");
