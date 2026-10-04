@@ -29,15 +29,32 @@ The last choice is remembered in `localStorage`.
 
 **The gig list lives in the Sheet**, tab `gigs`:
 
-| id | label | dates | active | startHour | endHour |
-|---|---|---|---|---|---|
-| `RCR Oct 30` | `RCR Oct 30` | `2026-10-07,2026-10-10,…` | ☑ | 9 | 23 |
+| id | label | dates | active | startHour | endHour | people |
+|---|---|---|---|---|---|---|
+| `RCR Oct 30` | `RCR Oct 30` | `2026-10-07,2026-10-10,…` | ☑ | 9 | 23 | `Alon MV, Skye, …` |
 
 - `id` is permanent and also becomes the name of that gig's response tab, so keep it
   simple. Sheets forbids `: \ / ? * [ ]` in tab names.
 - `label` is the button text; rename it freely.
 - `active` unticked hides the button without deleting the answers.
 - `startHour` / `endHour` are optional; blank falls back to the page defaults.
+- `people` is optional: a comma-separated roster. Those names show as buttons
+  immediately (dimmed until that person answers), so you can also see who is
+  still missing. Blank is fine — the buttons then build themselves from whoever
+  has answered.
+
+## Who are you?
+
+Nobody types their name twice. The page shows a button per known person; tapping
+one loads that person's saved grid, and the row collapses to a single chip
+afterwards (remembered per gig in `localStorage`). The free-text field is hidden
+behind **+ I'm new**.
+
+Typing is still possible, and guarded: a name that differs only by case resolves
+silently to the existing one, and a near-match (`anu` when `Anushka S` exists,
+or a second `John`) asks *"is that you?"* with an explicit way to say no. It
+never merges two people on its own, and Submit is disabled until that question is
+answered. This is what stopped `Skye Ocaranza` and `Skye` becoming two rows.
 
 **Adding a gig is one new row.** No code change, no deploy. Responses for it land in a
 new tab named after the `id`, created on the first submission.

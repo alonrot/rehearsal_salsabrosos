@@ -3,7 +3,7 @@
  *
  * SHEET LAYOUT
  *   "gigs"        the registry of polls. One row per gig:
- *                   id | label | dates | active | startHour | endHour
+ *                   id | label | dates | active | startHour | endHour | people
  *                 - id      permanent; also becomes the name of that gig's
  *                           response tab, so keep it simple (letters, digits,
  *                           spaces, dashes). Sheets forbids : \ / ? * [ ]
@@ -11,6 +11,12 @@
  *                 - dates   comma-separated ISO dates, e.g. 2026-10-07,2026-10-10
  *                 - active  FALSE (or a checkbox unticked) hides the button
  *                 - startHour / endHour  optional; blank falls back to the page
+ *                 - people  OPTIONAL comma-separated roster, e.g. "Alon MV, Skye".
+ *                           Those names appear as buttons straight away (dimmed
+ *                           until that person answers), so nobody has to type a
+ *                           name and spell it differently the second time.
+ *                           Leave it blank and the buttons build themselves from
+ *                           whoever has answered.
  *   "<gig id>"    one tab per gig, created on that gig's first submission:
  *                   name | tz | submittedAt | availability_json
  *
@@ -38,17 +44,17 @@ function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (ss.getSheetByName(GIGS_SHEET)) return "gigs tab already exists — nothing changed";
   const sh = ss.insertSheet(GIGS_SHEET, 0);
-  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour"]);
+  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "people"]);
   sh.appendRow([
     "RCR Oct 30",
     "RCR Oct 30",
     "2026-10-07,2026-10-10,2026-10-11,2026-10-14,2026-10-17," +
     "2026-10-18,2026-10-21,2026-10-24,2026-10-25,2026-10-28",
-    true, 9, 23
+    true, 9, 23, ""
   ]);
   sh.setFrozenRows(1);
   sh.getRange("D2:D").insertCheckboxes();
-  sh.autoResizeColumns(1, 6);
+  sh.autoResizeColumns(1, 7);
   return "gigs tab created";
 }
 
@@ -105,6 +111,8 @@ function readGigs_() {
     };
     if (rows[i][4] !== "" && rows[i][4] != null) g.startHour = Number(rows[i][4]);
     if (rows[i][5] !== "" && rows[i][5] != null) g.endHour = Number(rows[i][5]);
+    if (rows[i][6]) g.people = String(rows[i][6]).split(",").map(function (x) { return x.trim(); })
+                                                  .filter(function (x) { return x; });
     out.push(g);
   }
   return out;

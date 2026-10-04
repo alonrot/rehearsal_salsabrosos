@@ -63,7 +63,32 @@
     background:var(--panel); border:1px solid var(--line); color:var(--ink);
   }
   input[type=text]:focus{outline:none; border-color:var(--accent);}
-  #views{display:flex; flex:none; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; gap:3px;}
+  /* ---------- who are you? ---------- */
+  #whorow{flex:none; display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:4px 14px 0;}
+  #whorow:empty{display:none;}
+  #whorow .lbl{width:100%; margin:0; font-size:12px; color:var(--faint);}
+  #whorow button{
+    padding:6px 12px; border:1px solid var(--line); border-radius:999px;
+    background:var(--panel); color:var(--dim);
+    font-size:13px; font-weight:600; font-family:inherit; white-space:nowrap;
+  }
+  #whorow button.me{background:var(--accent); color:#fff; border-color:var(--accent);}
+  #whorow button.pending{opacity:.55; border-style:dashed;}   /* on the list, not answered yet */
+  #whorow button.add{color:var(--ink); border-style:dashed;}
+  #whorow .chg{font-size:12px; color:var(--faint); text-decoration:underline;}
+  #whook{flex:none; padding:9px 14px; border:0; border-radius:11px; background:var(--accent);
+         color:#fff; font-size:14px; font-weight:650; font-family:inherit;}
+  #nmatch{margin:8px 0 0; padding:9px 11px; border-radius:11px;
+          background:var(--panel); border:1px solid var(--line2);
+          display:flex; flex-wrap:wrap; gap:6px;}
+  #nmatch p{width:100%; margin:0 0 2px; font-size:12.5px; color:var(--ink); line-height:1.4;}
+  #nmatch button{padding:6px 12px; border:0; border-radius:999px; background:var(--accent);
+                 color:#fff; font-size:12.5px; font-weight:600; font-family:inherit;}
+  #nmatch button.ghost{background:transparent; border:1px solid var(--line2); color:var(--dim);}
+  /* an author display: rule beats the [hidden] attribute, so say it explicitly */
+  #nmatch[hidden], #who[hidden], #whook[hidden]{display:none;}
+
+  #views{display:flex; flex:none; margin-left:auto; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; gap:3px;}
   #views button{
     padding:7px 12px; border:0; border-radius:999px; background:transparent;
     color:var(--dim); font-size:13px; font-weight:600; font-family:inherit; white-space:nowrap;
@@ -150,15 +175,19 @@
   <div id="brand"><img alt="Salsabrosos" src="logo.png" width="418" height="96"></div>
   <div id="gigbar"></div>
 
+  <div id="whorow"></div>
+
   <div id="top">
     <div class="row">
       <img id="maracas" alt="" src="maracas.png" width="94" height="72">
-      <input type="text" id="who" placeholder="Your name" autocomplete="off" autocapitalize="words" enterkeyhint="done">
+      <input type="text" id="who" placeholder="Your name" autocomplete="off" autocapitalize="words" enterkeyhint="done" hidden>
+      <button id="whook" type="button" hidden>OK</button>
       <div id="views">
         <button id="vMe" aria-pressed="false">Me</button>
         <button id="vGroup" aria-pressed="true">Everyone</button>
       </div>
     </div>
+    <div id="nmatch" hidden></div>
     <p class="hint"><span id="hint"></span><span id="sync"></span></p>
   </div>
 
@@ -397,6 +426,7 @@ async function fetchData(){
     if (view==="group") renderCells();
     refreshBar();
     maybeLoadMine();
+    renderWho();                       // someone new may have answered since last poll
   }catch(err){ setSync(false); }
 }
 let online=null;
@@ -445,6 +475,133 @@ $("who").addEventListener("input", () => {
     refreshBar();
   }
 });
+
+/* ---------- who are you? ----------
+   The name field is the single source of truth for everything else (loading your
+   grid, the submit payload, the button state). These chips just drive it, so the
+   safe path is a tap and typing is the deliberate exception. Chips come from the
+   gig's optional "people" list in the Sheet, plus anyone who has already answered. */
+let picked = "", pendingConfirm = false;
+
+const nkey = x => String(x||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
+                  .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+
+function knownPeople(){
+  const answered = new Map();
+  group.forEach(r => answered.set(nkey(r.name), r.name));
+  const out = [], seen = new Set();
+  (CONFIG.people || []).forEach(n => {                 // pre-listed, in the Sheet's order
+    const k = nkey(n);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    out.push({ name: answered.get(k) || n, pending: !answered.has(k) });
+  });
+  group.forEach(r => {                                 // anyone else who has answered
+    const k = nkey(r.name);
+    if (!k || seen.has(k)) return;
+    seen.add(k);
+    out.push({ name: r.name, pending: false });
+  });
+  return out;
+}
+
+/* Only ever used to ASK - never to merge two people silently. */
+function looksLikeSameName(a, b){
+  if (a === b) return true;
+  if (a.startsWith(b + " ") || b.startsWith(a + " ")) return true;   // skye / skye ocaranza
+  const fa = a.split(" ")[0], fb = b.split(" ")[0];
+  if (fa === fb) return true;                                        // john / john gefroh
+  if (fa.length >= 3 && (fb.startsWith(fa) || fa.startsWith(fb))) return true;  // anu / anushka
+  return false;
+}
+
+function showNameInput(on){
+  $("who").hidden = !on;
+  $("whook").hidden = !on;
+  $("nmatch").hidden = true;
+  pendingConfirm = false;
+  if (on){ $("who").value = ""; refreshBar(); $("who").focus(); }
+}
+
+function selectIdentity(name){
+  picked = name;
+  pendingConfirm = false;
+  remember("who:" + (CONFIG.gigId || ""), name);
+  $("who").value = name;
+  $("who").dispatchEvent(new Event("input"));     // reuse the existing load-my-grid path
+  showNameInput(false);
+  renderWho();
+}
+
+function renderWho(){
+  const row = $("whorow");
+  if (editing) return;                            // don't reshuffle under someone mid-edit
+  row.innerHTML = "";
+
+  if (picked){                                    // collapsed: hand the space back to the grid
+    const b = document.createElement("button");
+    b.className = "me"; b.textContent = picked;
+    b.onclick = () => { picked = ""; renderWho(); };
+    const c = document.createElement("span");
+    c.className = "chg"; c.textContent = "not you?";
+    c.onclick = () => { picked = ""; renderWho(); };
+    row.append(b, c);
+    return;
+  }
+
+  const l = document.createElement("p");
+  l.className = "lbl"; l.textContent = "Who are you?";
+  row.appendChild(l);
+  knownPeople().forEach(pp => {
+    const b = document.createElement("button");
+    b.textContent = pp.name;
+    if (pp.pending) b.className = "pending";
+    b.onclick = () => selectIdentity(pp.name);
+    row.appendChild(b);
+  });
+  const add = document.createElement("button");
+  add.className = "add"; add.textContent = "+ I'm new";
+  add.onclick = () => showNameInput(true);
+  row.appendChild(add);
+}
+
+function commitTypedName(){
+  const raw = $("who").value.trim();
+  if (raw.length < 2) return;
+  const k = nkey(raw), people = knownPeople();
+  const exact = people.find(x => nkey(x.name) === k);
+  if (exact) return selectIdentity(exact.name);             // same person, canonical spelling
+  const near = people.filter(x => looksLikeSameName(k, nkey(x.name)));
+  if (near.length) return askNearMatch(raw, near);
+  selectIdentity(raw);
+}
+
+function askNearMatch(typed, near){
+  const el = $("nmatch");
+  el.innerHTML = "";
+  const q = document.createElement("p");
+  q.textContent = near.length === 1
+    ? "Someone already answered as \u201c" + near[0].name + "\u201d. Is that you?"
+    : "These people already answered: " + near.map(x => x.name).join(", ") + ". Are you one of them?";
+  el.appendChild(q);
+  near.forEach(n => {
+    const b = document.createElement("button");
+    b.textContent = "Yes, I'm " + n.name;
+    b.onclick = () => { el.hidden = true; selectIdentity(n.name); };
+    el.appendChild(b);
+  });
+  const no = document.createElement("button");
+  no.className = "ghost";
+  no.textContent = "No \u2014 I'm " + typed;
+  no.onclick = () => { el.hidden = true; selectIdentity(typed); };
+  el.appendChild(no);
+  el.hidden = false;
+  pendingConfirm = true;
+  refreshBar();
+}
+
+$("whook").onclick = commitTypedName;
+$("who").addEventListener("keydown", e => { if (e.key === "Enter") commitTypedName(); });
 
 /* ---- views + edit mode ---- */
 let view = "group";
@@ -495,6 +652,12 @@ function renderCells(){
 function refreshBar(){
   const b=$("mainbtn"), cnt=$("count");
   const named = norm($("who").value).length>1;
+  if (pendingConfirm){            // don't let them submit under a name we just queried
+    cnt.textContent = "";
+    b.disabled = true;
+    b.textContent = "Confirm who you are";
+    return;
+  }
   if (editing){
     const total = sel.flat().filter(Boolean).length;
     cnt.textContent = total+" slot"+(total===1?"":"s");
@@ -504,7 +667,8 @@ function refreshBar(){
   } else {
     cnt.textContent = group.length+" response"+(group.length===1?"":"s");
     b.disabled = !named;
-    b.textContent = named ? "✏️ Edit my availability" : "Enter your name to add yours";
+    b.textContent = !named ? "Enter your name to add yours"
+      : findResp(norm($("who").value)) ? "✏️ Edit my availability" : "＋ Add my availability";
   }
 }
 
@@ -725,6 +889,10 @@ $("mainbtn").onclick = async () => {
     b.disabled=false; b.textContent="Retry — couldn't reach server";
   }
 };
+
+picked = recall("who:" + (CONFIG.gigId || "")) || "";
+if (picked) $("who").value = picked;
+renderWho();
 
 layout(); setView("group");
 fetchData();
