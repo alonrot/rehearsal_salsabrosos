@@ -149,9 +149,14 @@
   #bot{flex:none; padding:10px 14px calc(10px + env(safe-area-inset-bottom));
     border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; background:var(--bg);}
   #count{font-size:13px; color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums;}
-  #mainbtn{flex:1; padding:13px; border:0; border-radius:12px; font-size:15.5px; font-weight:650;
-    font-family:inherit; background:var(--accent); color:#fff;}
+  #mainbtn{flex:0 1 auto; min-width:0; padding:13px 16px; border:0; border-radius:12px;
+    font-size:15.5px; font-weight:650; font-family:inherit; background:var(--accent); color:#fff;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   #mainbtn:disabled{background:#222c4d; color:var(--faint);}
+  #exitbtn{flex:none; margin-left:auto; width:46px; height:46px; padding:0; border:1px solid var(--line2);
+    border-radius:12px; background:var(--panel); color:var(--dim);
+    font-size:17px; font-family:inherit; line-height:1;}
+  #exitbtn[hidden]{display:none;}
   /* Fills the grid area while the gig list loads, and doubles as the no-JS
      fallback. position/inset are needed because #vp>div makes it absolute with
      no box, and z-index must beat #corner (3) or that top-left block paints
@@ -206,6 +211,7 @@
   <div id="bot">
     <span id="count"></span>
     <button id="mainbtn" disabled>…</button>
+    <button id="exitbtn" type="button" aria-label="Back to everyone" hidden>✕</button>
   </div>
 </div>
 
@@ -523,7 +529,7 @@ function showNameInput(on){
   if (on){ $("who").value = ""; refreshBar(); $("who").focus(); }
 }
 
-function selectIdentity(name){
+function selectIdentity(name, show){
   picked = name;
   pendingConfirm = false;
   remember("who:" + (CONFIG.gigId || ""), name);
@@ -531,6 +537,10 @@ function selectIdentity(name){
   $("who").dispatchEvent(new Event("input"));     // reuse the existing load-my-grid path
   showNameInput(false);
   renderWho();
+  // A deliberate tap jumps straight to that person's slots (read-only - painting
+  // needs `editing`, which only the main button sets). Restoring a remembered
+  // identity on load passes show=false, so you still land on the group overlay.
+  if (show && findResp(norm(name))) setView("me");
 }
 
 function renderWho(){
@@ -541,7 +551,8 @@ function renderWho(){
   if (picked){                                    // collapsed: hand the space back to the grid
     const b = document.createElement("button");
     b.className = "me"; b.textContent = picked;
-    b.onclick = () => { picked = ""; renderWho(); };
+    // tapping the person shows their slots again; "not you?" is how you switch
+    b.onclick = () => { if (findResp(norm(picked))) setView("me"); };
     const c = document.createElement("span");
     c.className = "chg"; c.textContent = "not you?";
     c.onclick = () => { picked = ""; renderWho(); };
@@ -556,7 +567,7 @@ function renderWho(){
     const b = document.createElement("button");
     b.textContent = pp.name;
     if (pp.pending) b.className = "pending";
-    b.onclick = () => selectIdentity(pp.name);
+    b.onclick = () => selectIdentity(pp.name, true);
     row.appendChild(b);
   });
   const add = document.createElement("button");
@@ -570,10 +581,10 @@ function commitTypedName(){
   if (raw.length < 2) return;
   const k = nkey(raw), people = knownPeople();
   const exact = people.find(x => nkey(x.name) === k);
-  if (exact) return selectIdentity(exact.name);             // same person, canonical spelling
+  if (exact) return selectIdentity(exact.name, true);             // same person, canonical spelling
   const near = people.filter(x => looksLikeSameName(k, nkey(x.name)));
   if (near.length) return askNearMatch(raw, near);
-  selectIdentity(raw);
+  selectIdentity(raw, true);
 }
 
 function askNearMatch(typed, near){
@@ -587,13 +598,13 @@ function askNearMatch(typed, near){
   near.forEach(n => {
     const b = document.createElement("button");
     b.textContent = "Yes, I'm " + n.name;
-    b.onclick = () => { el.hidden = true; selectIdentity(n.name); };
+    b.onclick = () => { el.hidden = true; selectIdentity(n.name, true); };
     el.appendChild(b);
   });
   const no = document.createElement("button");
   no.className = "ghost";
   no.textContent = "No \u2014 I'm " + typed;
-  no.onclick = () => { el.hidden = true; selectIdentity(typed); };
+  no.onclick = () => { el.hidden = true; selectIdentity(typed, true); };
   el.appendChild(no);
   el.hidden = false;
   pendingConfirm = true;
@@ -611,6 +622,7 @@ function setView(v){
   document.body.className = v;
   $("vMe").setAttribute("aria-pressed", v==="me");
   $("vGroup").setAttribute("aria-pressed", v==="group");
+  $("exitbtn").hidden = v!=="me";
   hideTip(); renderCells(); refreshBar(); setHint();
 }
 function startEditing(){
@@ -624,6 +636,16 @@ function stopEditing(){
   vp.classList.remove("editing");
   setHint();
 }
+/* Leave one person's grid without submitting. Any unsaved painting is dropped and
+   the saved copy restored, so backing out can never half-change someone's answer. */
+function exitMe(){
+  if (editing){ editing = false; vp.classList.remove("editing"); }
+  gridDirty = false; loadedFor = "";
+  if (findResp(norm($("who").value))) maybeLoadMine(true); else clearSel();
+  setView("group");
+}
+$("exitbtn").onclick = exitMe;
+
 $("vMe").onclick    = ()=>setView("me");
 $("vGroup").onclick = ()=>setView("group");
 
@@ -631,7 +653,8 @@ function setHint(){
   $("hint").textContent =
     editing        ? "☝️ Paint your free slots · ✌️ Move / pinch" :
     view==="group" ? "Brighter green = more people · Tap a slot to see who · Pinch to zoom" :
-                     "Your saved availability · tap ✏️ to change it";
+                     (picked ? picked + "’s saved slots · ✕ to go back"
+                             : "Saved availability · ✕ to go back");
 }
 function renderCells(){
   for (let r=0;r<NR;r++) for (let c=0;c<ND;c++){

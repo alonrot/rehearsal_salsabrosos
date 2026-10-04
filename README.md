@@ -54,7 +54,12 @@ Typing is still possible, and guarded: a name that differs only by case resolves
 silently to the existing one, and a near-match (`anu` when `Anushka S` exists,
 or a second `John`) asks *"is that you?"* with an explicit way to say no. It
 never merges two people on its own, and Submit is disabled until that question is
-answered. This is what stopped `Skye Ocaranza` and `Skye` becoming two rows.
+answered.
+
+Tapping a name also *shows* that person's slots straight away, read-only — painting
+needs edit mode, which only the main button turns on. The ✕ at the bottom right
+leaves that view and restores their saved grid, so backing out can never half-change
+someone's answer. This is what stopped `Skye Ocaranza` and `Skye` becoming two rows.
 
 **Adding a gig is one new row.** No code change, no deploy. Responses for it land in a
 new tab named after the `id`, created on the first submission.
