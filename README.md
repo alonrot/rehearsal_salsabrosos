@@ -51,7 +51,10 @@ toggle.
 - **Tap a name** → that chip highlights, everyone else stays plain, and the grid shows
   that person's slots, read-only.
 - **Tap another name** → switches straight to them.
-- **Tap the highlighted name again** → deselects, back to everyone's heat map.
+- **Tap the highlighted name again**, or anywhere outside the calendar (the logo, the
+  hint line, empty space) → deselects, back to everyone's heat map. Taps inside the
+  grid are excluded so you can still tap a slot to see who's free, and the whole
+  thing is disabled while editing so a stray tap can't drop half-painted work.
 - **Edit availability** (bottom, only when someone is selected) → edit mode. The buttons
   become **Submit** and **Discard**, and the name chips freeze so a stray tap can't swap
   person mid-paint. Discard restores their saved grid and stays on them.

@@ -637,6 +637,20 @@ function deselect(){
   setView("group");
   renderWho();
 }
+
+/* Tapping anywhere that isn't the calendar or a control also clears the selection.
+   The grid is excluded so tapping a slot can still show who's free, and editing is
+   excluded so a stray tap can never discard half-painted availability. */
+const KEEP = "#vp, #whorow, #bot, #gigbar, #nmatch, #who, #whook";
+document.addEventListener("click", e => {
+  if (!picked || editing) return;
+  // composedPath() is captured when the event is dispatched, so it still holds the
+  // original ancestors even though tapping a chip re-renders (and detaches) it.
+  // Using e.target.closest() here would see a detached node and wrongly deselect.
+  const path = e.composedPath ? e.composedPath() : [e.target];
+  for (const n of path) if (n instanceof Element && n.matches(KEEP)) return;
+  deselect();
+});
 $("discardbtn").onclick = exitMe;
 
 function setHint(){
