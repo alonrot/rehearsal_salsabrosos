@@ -89,6 +89,21 @@ because Apps Script web apps don't answer `OPTIONS`. Apps Script still receives 
 JSON in `e.postData.contents`. **Don't change it to `application/json`** or submissions
 will fail from the deployed site while still working locally.
 
+## Loading
+
+Apps Script takes ~2s per request, so the page is built to make **one** of them, not two.
+`doGet` returns `{gigs, responses}` together, and `boot()` asks for the gig's responses in
+the same call whenever it already knows the gig — from `?gig=` in the link, or the last
+gig remembered in `localStorage`. Only a first-time visitor on a bare URL pays for a
+second round trip.
+
+The loading panel stays up until the grid actually has data in it. Removing it earlier
+(which is what it used to do) left a fully drawn but **empty** calendar on screen for the
+length of the responses fetch, which read as a bug.
+
+`maracas.png` is `<link rel="preload">`ed and kept in the DOM while hidden, so it is
+already cached when the name field reveals it.
+
 ## Local testing
 
 ```bash

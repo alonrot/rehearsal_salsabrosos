@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Rehearsal availability</title>
 
+<link rel="preload" as="image" href="maracas.png">
 <link rel="icon" href="favicon.png" sizes="64x64">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0b1020">
@@ -56,6 +57,7 @@
   #gigbar button[aria-pressed=true]{background:var(--accent); color:#fff; border-color:var(--accent);}
   #gigbar .note{font-size:12px; color:var(--faint); padding:4px 0;}
   #maracas{height:34px; width:auto; flex:none; display:block;}
+  #maracas[hidden]{display:none;}
   #top{padding:8px 14px 8px; flex:none;}
   .row{display:flex; gap:8px; align-items:center;}
   input[type=text]{
@@ -75,6 +77,8 @@
   #whorow button.me{background:var(--accent); color:#fff; border-color:var(--accent);}
   #whorow button.pending{opacity:.55; border-style:dashed;}   /* on the list, not answered yet */
   #whorow button.add{color:var(--ink); border-style:dashed;}
+  #whorow button.add.me{background:var(--accent); color:#fff;
+                        border-color:var(--accent); border-style:solid;}
   #whorow.locked button{opacity:.4; pointer-events:none;}
   #whorow .chg{font-size:12px; color:var(--faint); text-decoration:underline;}
   #whook{flex:none; padding:9px 14px; border:0; border-radius:11px; background:var(--accent);
@@ -179,7 +183,7 @@
 
   <div id="top">
     <div class="row">
-      <img id="maracas" alt="" src="maracas.png" width="94" height="72">
+      <img id="maracas" alt="" src="maracas.png" width="94" height="72" hidden>
       <input type="text" id="who" placeholder="Your name" autocomplete="off" autocapitalize="words" enterkeyhint="done" hidden>
       <button id="whook" type="button" hidden>OK</button>
     </div>
@@ -236,8 +240,7 @@ const CONFIG = {
    there - no code change, no deploy. It has to be fetched BEFORE the grid is
    built, because CONFIG.dates decides the grid's shape and that happens once.
    Switching gig reloads with ?gig=<id> instead of rebuilding the grid. */
-const GIGS_URL = () => CONFIG.apiBase ? CONFIG.apiBase + "?what=gigs"
-                                      : "data.json?what=gigs";
+let SEED = null;        // responses that arrived with the gig list, if any
 const remember = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
 const recall   = k      => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
 
@@ -264,15 +267,23 @@ async function boot(){
     nojs.innerHTML = '<img src="maracas.png" width="94" height="72" alt="">'
                    + '<div class="lbl">Loading\u2026</div>';
   }
-  let gigs = [];
+  // Ask for the gig's responses in the SAME call when we already know which gig
+  // (shared links carry ?gig=). doGet returns {gigs, responses} together, so this
+  // saves a second ~2s Apps Script round trip before anything can be drawn.
+  const want = new URLSearchParams(location.search).get("gig") || recall("gig") || "";
+  const base = CONFIG.apiBase || "data.json";
+  const first = base + (want ? "?gig=" + encodeURIComponent(want) : "?what=gigs");
+
+  let gigs = [], payload = null;
   try{
-    const res = await fetch(GIGS_URL(), {cache:"no-store"});
-    if (res.ok) gigs = (await res.json()).gigs || [];
+    const res = await fetch(first, {cache:"no-store"});
+    if (res.ok){ payload = await res.json(); gigs = payload.gigs || []; }
   }catch(e){ /* leave gigs empty; CONFIG.dates below is the fallback */ }
 
   if (gigs.length){
-    const want = new URLSearchParams(location.search).get("gig") || recall("gig");
     const gig  = gigs.find(g => g.id === want) || gigs[0];
+    // only reuse the responses if they really are for the gig we settled on
+    if (payload && Array.isArray(payload.responses) && gig.id === want) SEED = payload.responses;
     CONFIG.gigId = gig.id;
     if (gig.dates && gig.dates.length) CONFIG.dates = gig.dates;
     if (gig.startHour != null) CONFIG.startHour = gig.startHour;
@@ -301,7 +312,6 @@ const norm = s => s.trim().toLowerCase();
 
 const $ = id => document.getElementById(id);
 const vp=$("vp"), cellsEl=$("cells"), hdrEl=$("dayhdr"), tcolEl=$("timecol"), tip=$("tip");
-$("nojs").remove();
 
 /* ---- build DOM ---- */
 CONFIG.dates.forEach(iso => {
@@ -478,7 +488,7 @@ $("who").addEventListener("input", () => {
    grid, the submit payload, the button state). These chips just drive it, so the
    safe path is a tap and typing is the deliberate exception. Chips come from the
    gig's optional "people" list in the Sheet, plus anyone who has already answered. */
-let picked = "", pendingConfirm = false;
+let picked = "", pendingConfirm = false, newMode = false;
 
 const nkey = x => String(x||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
                   .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
@@ -513,11 +523,14 @@ function looksLikeSameName(a, b){
 }
 
 function showNameInput(on){
+  newMode = !!on;
   $("who").hidden = !on;
   $("whook").hidden = !on;
+  $("maracas").hidden = !on;      // the icon belongs to the name field
   $("nmatch").hidden = true;
   pendingConfirm = false;
-  if (on){ $("who").value = ""; refreshBar(); $("who").focus(); }
+  if (on){ $("who").value = ""; $("who").focus(); }
+  refreshBar();
 }
 
 function selectIdentity(name){
@@ -555,8 +568,9 @@ function renderWho(){
   });
 
   const add = document.createElement("button");
-  add.className = "add"; add.textContent = "+ I'm new";
-  add.onclick = () => showNameInput(true);
+  add.className = newMode ? "add me" : "add";
+  add.textContent = "+ I'm new";
+  add.onclick = () => { showNameInput(!newMode); renderWho(); };   // tap on / tap off
   row.appendChild(add);
 }
 
@@ -921,9 +935,21 @@ $("mainbtn").onclick = async () => {
 renderWho();
 
 layout(); setView("group");
-fetchData();
-setInterval(fetchData, CONFIG.pollMs);
-document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) fetchData(); });
+
+/* The loading panel stays up until the grid actually has data in it - otherwise
+   you get a fully drawn but empty calendar for the length of the responses fetch. */
+(async () => {
+  if (SEED){
+    group = SEED; rebuildCounts(); renderCells(); refreshBar(); renderWho(); setSync(true);
+  } else {
+    await fetchData();                       // no gig in the link: second trip needed
+  }
+  const n = document.getElementById("nojs");
+  if (n) n.remove();
+  layout();
+  setInterval(fetchData, CONFIG.pollMs);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) fetchData(); });
+})();
 
 }  /* end startApp */
 
