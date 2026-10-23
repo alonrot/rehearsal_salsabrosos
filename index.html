@@ -246,7 +246,6 @@
   <div id="gigbar"></div>
 
   <div id="subbar" hidden>
-    <button data-tab="details"   aria-pressed="true">Gig Details</button>
     <button data-tab="rehearsal" aria-pressed="false">Rehearsal</button>
   </div>
 
@@ -825,7 +824,10 @@ function setTab(t){
   hideTip();
   if (t !== "details") layout();     // #vp had no size while hidden - re-measure
 }
-for (const b of $("subbar").children) b.onclick = () => setTab(b.dataset.tab);
+/* One button, toggled: on = the calendar, off = back to the gig details. */
+for (const b of $("subbar").children)
+  b.onclick = () => setTab(document.body.classList.contains("tab-details")
+                             ? "rehearsal" : "details");
 
 /* ---- views + edit mode ---- */
 let view = "group";
@@ -871,7 +873,7 @@ function deselect(){
 /* Tapping anywhere that isn't the calendar or a control also clears the selection.
    The grid is excluded so tapping a slot can still show who's free, and editing is
    excluded so a stray tap can never discard half-painted availability. */
-const KEEP = "#vp, #whorow, #bot, #gigbar, #nmatch, #who, #whook";
+const KEEP = "#vp, #whorow, #bot, #gigbar, #subbar, #details, #nmatch, #who, #whook";
 document.addEventListener("click", e => {
   if (!picked || editing) return;
   // composedPath() is captured when the event is dispatched, so it still holds the
