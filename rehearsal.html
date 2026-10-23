@@ -88,6 +88,20 @@
   #details .who{margin-top:4px; padding-top:14px; border-top:1px solid var(--line);}
   #details .who p{margin:0 0 6px; font-size:13px; line-height:1.6; color:var(--faint);}
   #details .who b{color:var(--dim); font-weight:650;}
+  #details .addme{margin-top:14px;}
+  #details .addme button{padding:10px 16px; border:1px dashed var(--line2); border-radius:12px;
+    background:transparent; color:var(--ink); font-size:14px; font-weight:600; font-family:inherit;}
+  #details #addmeform{display:flex; flex-direction:column; gap:8px; max-width:340px;}
+  #details #addmeform[hidden]{display:none;}
+  #details #addmeform input{padding:11px 13px; font-size:16px; border-radius:11px;
+    background:var(--panel); border:1px solid var(--line); color:var(--ink); font-family:inherit;}
+  #details #addmeform input:focus{outline:none; border-color:var(--accent);}
+  #details .row2{display:flex; gap:8px;}
+  #details #amSave{border:0; background:var(--accent); color:#fff;}
+  #details #amSave:disabled{background:#222c4d; color:var(--faint);}
+  #details .ghost{border:1px solid var(--line2); color:var(--dim);}
+  #details #amMsg{margin:2px 0 0; font-size:12.5px; color:var(--faint); line-height:1.45;}
+  #details #amMsg b{color:var(--dim);}
   #details h4{margin:14px 0 4px; font-size:14px; font-weight:650; color:var(--ink);}
   #details .kv{display:flex; gap:12px; padding:7px 0; border-bottom:1px solid var(--line);}
   #details .kv .k{flex:0 0 94px; color:var(--faint); font-size:13px; line-height:1.45;}
@@ -566,28 +580,17 @@ let picked = "", pendingConfirm = false, newMode = false;
 const nkey = x => String(x||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
                   .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 
-/* The people column may carry instruments: "Anushka S (lead singer), Daniel N (bass)".
-   Chips only ever use the name, so matching against submitted rows is unaffected. */
-const parsePerson = x => {
-  const m = String(x).match(/^\s*(.+?)\s*\(([^)]*)\)\s*$/);
-  return m ? { name: m[1].trim(), role: m[2].trim() }
-           : { name: String(x).trim(), role: "" };
-};
-const roster = () => (CONFIG.people || []).map(parsePerson).filter(p => p.name);
-
+/* One record per person per gig: the response row IS the roster entry, so a name
+   can't exist twice under two spellings. Column G is no longer used. */
 function knownPeople(){
-  const answered = new Map();
-  group.forEach(r => answered.set(nkey(r.name), r.name));
   const out = [], seen = new Set();
-  const add = n => {
-    const k = nkey(n);
+  group.forEach(r => {
+    const k = nkey(r.name);
     if (!k || seen.has(k)) return;
     seen.add(k);
-    out.push({ name: answered.get(k) || n, pending: !answered.has(k) });
-  };
-  roster().forEach(p => add(p.name));   // pre-listed on the gig's row in the Sheet
-  myNames().forEach(add);               // introduced here, maybe not submitted yet
-  group.forEach(r => add(r.name));      // anyone who has answered
+    out.push({ name: r.name, role: (r.instrument || "").trim(),
+               pending: !Object.keys(r.availability || {}).length });
+  });
   return out;
 }
 
@@ -634,7 +637,8 @@ function renderWho(){
   const l = document.createElement("p");
   l.className = "lbl";
   l.textContent = picked ? "Showing " + picked + " \u00b7 tap again for everyone"
-                         : "Tap a name to see their slots";
+                         : (people.length ? "Tap a name to see their slots"
+                                          : "Nobody yet \u2014 add yourself on Gig Details");
   row.appendChild(l);
 
   people.forEach(pp => {
@@ -646,11 +650,6 @@ function renderWho(){
     row.appendChild(b);
   });
 
-  const add = document.createElement("button");
-  add.className = newMode ? "add me" : "add";
-  add.textContent = "+ I'm new";
-  add.onclick = () => { showNameInput(!newMode); renderWho(); };   // tap on / tap off
-  row.appendChild(add);
 }
 
 function commitTypedName(){
@@ -736,6 +735,7 @@ function detailsBlock(text){
 }
 
 function renderDetails(){
+  if (addOpen) return;                 // a poll must not clear the form mid-typing
   const el = $("details"), g = CONFIG.gigData || {};
   const out = [];
 
@@ -746,24 +746,77 @@ function renderDetails(){
   if (g.sheets)  links.push(card(g.sheets,  "doc",  ICON_DOC,  "Music sheets"));
   if (links.length) out.push("<section>" + links.join("") + "</section>");
 
-  const answered = new Set(group.map(x => nkey(x.name)));
-  const named = p => esc(p.name + (p.role ? " (" + p.role + ")" : ""));
-  const list  = roster();
-  const yes = list.filter(p => answered.has(nkey(p.name)));
-  const no  = list.filter(p => !answered.has(nkey(p.name)));
-  // people who answered but aren't on the roster still count as confirmed
-  group.forEach(x => { if (!list.some(p => nkey(p.name) === nkey(x.name)))
-                         yes.push({ name: x.name, role: "" }); });
-  if (yes.length || no.length){
-    const bits = [];
-    if (yes.length) bits.push("<p><b>Confirmed:</b> " + yes.map(named).join(", ") + "</p>");
-    if (no.length)  bits.push("<p><b>Not yet:</b> "   + no.map(named).join(", ")  + "</p>");
-    out.push('<section class="who">' + bits.join("") + "</section>");
+  const who = knownPeople();
+  if (who.length){
+    const named = p => esc(p.name + (p.role ? " (" + p.role + ")" : ""));
+    out.push('<section class="who"><p><b>Confirmed:</b> '
+             + who.map(named).join(", ") + "</p></section>");
   }
+
+  out.push(
+    '<section class="addme">' +
+      '<button id="addmebtn" type="button">+ Add myself</button>' +
+      '<div id="addmeform" hidden>' +
+        '<input id="amName" type="text" placeholder="Your name" autocomplete="off" autocapitalize="words">' +
+        '<input id="amInst" type="text" placeholder="Instrument (e.g. trombone)" autocomplete="off">' +
+        '<div class="row2">' +
+          '<button id="amSave" type="button">Add me</button>' +
+          '<button id="amCancel" type="button" class="ghost">Cancel</button>' +
+        '</div>' +
+        '<p id="amMsg"></p>' +
+      "</div>" +
+    "</section>");
 
   el.innerHTML = out.length ? out.join("")
     : '<p class="empty">No details for this gig yet.</p>';
+  wireAddMe();
 }
+
+/* ---------- add myself ---------- */
+let addOpen = false;
+
+function wireAddMe(){
+  const btn = $("addmebtn"); if (!btn) return;
+  const form = $("addmeform"), msg = $("amMsg");
+  const close = () => { addOpen = false; form.hidden = true; btn.hidden = false;
+                        msg.textContent = ""; renderDetails(); };
+  btn.onclick = () => {
+    addOpen = true; btn.hidden = true; form.hidden = false;
+    $("amName").value = ""; $("amInst").value = ""; msg.textContent = "";
+    $("amName").focus();
+  };
+  $("amCancel").onclick = close;
+  $("amSave").onclick = async () => {
+    const name = $("amName").value.trim(), inst = $("amInst").value.trim();
+    if (name.length < 2){ msg.textContent = "Please type your name."; return; }
+    const here = knownPeople();
+    const exact = here.find(x => nkey(x.name) === nkey(name));
+    if (exact){ msg.textContent = "\u201c" + exact.name + "\u201d is already on the list."; return; }
+    const near = here.filter(x => looksLikeSameName(nkey(name), nkey(x.name)));
+    if (near.length && !confirmedNew){
+      msg.innerHTML = "Already listed: <b>" + near.map(x => esc(x.name)).join(", ")
+        + "</b>. Tap <b>Add me</b> again if you are someone else.";
+      confirmedNew = true; return;
+    }
+    $("amSave").disabled = true; msg.textContent = "Adding\u2026";
+    try{
+      // an empty availability row registers them; they paint slots later
+      const res = await fetch(POST_URL(), { method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ gig: CONFIG.gigId, name: name, instrument: inst,
+                               tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                               submittedAt: new Date().toISOString(), availability: {} }) });
+      if (!res.ok) throw new Error(res.status);
+      confirmedNew = false;
+      addOpen = false; groupStamp = "";
+      await fetchData();                 // repaints Confirmed and the Rehearsal chips
+      close();
+    }catch(err){
+      msg.textContent = "Couldn\u2019t reach the server \u2014 try again.";
+    }finally{ $("amSave").disabled = false; }
+  };
+}
+let confirmedNew = false;
 
 function setTab(t){
   document.body.classList.toggle("tab-details", t === "details");

@@ -23,7 +23,11 @@
  *                 - details  OPTIONAL free text: venue, address, load-in, dress code.
  *                            Blank lines separate paragraphs; URLs become links.
  *   "<gig id>"    one tab per gig, created on that gig's first submission:
- *                   name | tz | submittedAt | availability_json
+ *                   name | tz | submittedAt | availability_json | instrument
+ *                 A row is created the moment someone adds themselves on the Gig
+ *                 Details tab, before any availability exists. That row IS the
+ *                 roster: one record per person per gig, so a name can never be
+ *                 on the roster and in the responses under two spellings.
  *
  * SETUP
  *   Run setup() once from this editor (Run ▸ setup). It creates the "gigs" tab
@@ -42,7 +46,7 @@
  */
 
 const GIGS_SHEET = "gigs";
-const HEADERS = ["name", "tz", "submittedAt", "availability_json"];
+const HEADERS = ["name", "tz", "submittedAt", "availability_json", "instrument"];
 
 /** Run this once from the editor. Safe to re-run — it won't clobber an existing tab. */
 function setup() {
@@ -78,6 +82,7 @@ function doPost(e) {
     const p = JSON.parse(e.postData.contents);
     const name = String(p.name || "").trim();
     const gig = String(p.gig || "").trim();
+    var inst = String(p.instrument || "").trim();
     if (!name) return json_({ error: "name required" });
     if (!gig) return json_({ error: "gig required" });
 
@@ -85,13 +90,18 @@ function doPost(e) {
     const rows = sh.getDataRange().getValues();
     // upsert: drop any existing row for this person in THIS gig, then append
     for (let i = rows.length - 1; i >= 1; i--) {
-      if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) sh.deleteRow(i + 1);
+      if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) {
+        // a plain availability submit carries no instrument - keep the stored one
+        if (!inst) inst = String(rows[i][4] || "").trim();
+        sh.deleteRow(i + 1);
+      }
     }
     sh.appendRow([
       name,
       p.tz || "",
       p.submittedAt || new Date().toISOString(),
-      JSON.stringify(p.availability || {})
+      JSON.stringify(p.availability || {}),
+      inst
     ]);
     return json_({ ok: true });
   } catch (err) {
@@ -140,7 +150,8 @@ function readResponses_(gigId) {
       name: rows[i][0],
       tz: rows[i][1],
       submittedAt: rows[i][2] instanceof Date ? rows[i][2].toISOString() : rows[i][2],
-      availability: av
+      availability: av,
+      instrument: String(rows[i][4] || "").trim()
     });
   }
   return out;
@@ -153,6 +164,8 @@ function respSheet_(gigId) {
     sh = ss.insertSheet(gigId);
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
+  } else if (!sh.getRange(1, 5).getValue()) {
+    sh.getRange(1, 5).setValue("instrument");   // migrate a tab made before this column
   }
   return sh;
 }

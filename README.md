@@ -51,34 +51,26 @@ never use `people`, or youtube / sheets / details land in the wrong fields.
   whole column is silently dead.
 - `youtube`, `sheets`, `details` feed the Gig Details tab — see below.
 
-## Who are you? / seeing one person's slots
+## Who is on the gig
 
-The name row is always visible and is the only view control — there is no Me/Everyone
-toggle.
+**One record per person per gig.** Someone adds themselves on **Gig Details** → that
+writes a row in the gig's response tab with their name, their instrument and an empty
+availability. That row *is* the roster entry, so a person can never exist twice under two
+spellings — which is exactly what a hand-typed roster in column G could not guarantee.
 
-- **Tap a name** → that chip highlights, everyone else stays plain, and the grid shows
-  that person's slots, read-only.
-- **Tap another name** → switches straight to them.
-- **Tap the highlighted name again**, or anywhere outside the calendar (the logo, the
-  hint line, empty space) → deselects, back to everyone's heat map. Taps inside the
-  grid are excluded so you can still tap a slot to see who's free, and the whole
-  thing is disabled while editing so a stray tap can't drop half-painted work.
-- **Edit availability** (bottom, only when someone is selected) → edit mode. The buttons
-  become **Submit** and **Discard**, and the name chips freeze so a stray tap can't swap
-  person mid-paint. Discard restores their saved grid and stays on them.
+- Gig Details lists everyone as **Confirmed: Name (instrument), …**
+- The same people appear as chips on **Rehearsal**, so they can paint slots whenever.
+- Someone can be on the gig and never fill in the rehearsal grid. That is normal and the
+  two are deliberately not coupled.
+- Column **G (`people`) is no longer used.** Leave it empty.
 
-Painting is gated on edit mode, so simply viewing someone can never change their answer.
-Nothing is remembered between visits: every load starts on the group overlay, so you
-can't accidentally submit as the last person you were looking at.
+Adding yourself is guarded: an exact name already on the list is refused, and a
+near-match ("Alon" when "Alon MV" exists) warns once and needs a second tap. It never
+merges two people on its own.
 
-Typing is still available behind **+ I'm new**, and guarded: a name differing only by
-case resolves silently to the existing one, and a near-match (`anu` when `Anushka S`
-exists, or a second `John`) asks *"is that you?"* with an explicit way to say no. It
-never merges two people on its own, and Submit is disabled until that is answered.
-
-Names someone introduces via **+ I'm new** are remembered per gig in `localStorage`, so
-the chip survives a reload or tapping away even before they have painted anything. It is
-local to that device — other people only see names that have actually been submitted.
+The response tab's columns are `name | tz | submittedAt | availability_json | instrument`.
+A plain availability submit carries no instrument, so `doPost` copies the stored one
+forward rather than blanking it.
 
 ## Rehearsal / Details
 
