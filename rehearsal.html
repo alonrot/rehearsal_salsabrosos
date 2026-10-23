@@ -925,8 +925,10 @@ function refreshBar(){
     d.hidden = true;
     b.hidden = !picked;                       // nothing selected -> nothing to do
     b.disabled = !named;
-    b.textContent = findResp(norm($("who").value)) ? "✏️ Edit availability"
-                                                   : "＋ Add availability";
+    // on the roster but no slots painted yet -> "Add", not "Edit"
+    const mine = findResp(norm($("who").value));
+    b.textContent = (mine && Object.keys(mine.availability || {}).length)
+      ? "✏️ Edit availability" : "＋ Add availability";
   }
 }
 
