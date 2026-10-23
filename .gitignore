@@ -16,3 +16,6 @@ __pycache__/
 import_whenitworks.gs
 availability_whenitworks.html
 *whenitworks*
+
+# scratch backups Claude makes before patching
+.bak*

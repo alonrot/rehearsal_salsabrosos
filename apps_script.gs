@@ -4,6 +4,7 @@
  * SHEET LAYOUT
  *   "gigs"        the registry of polls. One row per gig:
  *                   id | label | dates | active | startHour | endHour | people
+ *                   | youtube | setlist | details
  *                 - id      permanent; also becomes the name of that gig's
  *                           response tab, so keep it simple (letters, digits,
  *                           spaces, dashes). Sheets forbids : \ / ? * [ ]
@@ -17,6 +18,10 @@
  *                           name and spell it differently the second time.
  *                           Leave it blank and the buttons build themselves from
  *                           whoever has answered.
+ *                 - youtube  OPTIONAL playlist/video URL for the Details tab
+ *                 - setlist  OPTIONAL one song per line (Alt+Enter inside the cell)
+ *                 - details  OPTIONAL free text: venue, address, load-in, dress code.
+ *                            Blank lines separate paragraphs; URLs become links.
  *   "<gig id>"    one tab per gig, created on that gig's first submission:
  *                   name | tz | submittedAt | availability_json
  *
@@ -44,17 +49,18 @@ function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (ss.getSheetByName(GIGS_SHEET)) return "gigs tab already exists — nothing changed";
   const sh = ss.insertSheet(GIGS_SHEET, 0);
-  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "people"]);
+  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "people",
+                "youtube", "setlist", "details"]);
   sh.appendRow([
     "RCR Oct 30",
     "RCR Oct 30",
     "2026-10-07,2026-10-10,2026-10-11,2026-10-14,2026-10-17," +
     "2026-10-18,2026-10-21,2026-10-24,2026-10-25,2026-10-28",
-    true, 9, 23, ""
+    true, 9, 23, "", "", "", ""
   ]);
   sh.setFrozenRows(1);
   sh.getRange("D2:D").insertCheckboxes();
-  sh.autoResizeColumns(1, 7);
+  sh.autoResizeColumns(1, 10);
   return "gigs tab created";
 }
 
@@ -113,6 +119,10 @@ function readGigs_() {
     if (rows[i][5] !== "" && rows[i][5] != null) g.endHour = Number(rows[i][5]);
     if (rows[i][6]) g.people = String(rows[i][6]).split(",").map(function (x) { return x.trim(); })
                                                   .filter(function (x) { return x; });
+    if (rows[i][7]) g.youtube = String(rows[i][7]).trim();
+    if (rows[i][8]) g.setlist = String(rows[i][8]).split("\n").map(function (x) { return x.trim(); })
+                                                  .filter(function (x) { return x; });
+    if (rows[i][9]) g.details = String(rows[i][9]);
     out.push(g);
   }
   return out;

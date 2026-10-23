@@ -68,6 +68,21 @@ case resolves silently to the existing one, and a near-match (`anu` when `Anushk
 exists, or a second `John`) asks *"is that you?"* with an explicit way to say no. It
 never merges two people on its own, and Submit is disabled until that is answered.
 
+Names someone introduces via **+ I'm new** are remembered per gig in `localStorage`, so
+the chip survives a reload or tapping away even before they have painted anything. It is
+local to that device — other people only see names that have actually been submitted.
+
+## Rehearsal / Details
+
+Under the gig row sit two tabs. **Rehearsal** is the availability grid. **Details** is a
+read-only page built from three optional cells on the gig's row: `details` (free text —
+blank lines separate paragraphs, URLs become links), `setlist` (one song per line, use
+Alt+Enter inside the cell) and `youtube` (a playlist URL, rendered as a button). Leave
+them blank and the tab says so. Sheet content is HTML-escaped before rendering.
+
+Switching back to Rehearsal re-runs `layout()`, because `#vp` has no measurable size
+while it is `display:none` and the grid geometry is computed from its box.
+
 ## The two backends
 
 `index.html` talks to one of two interchangeable backends, picked automatically by

@@ -56,6 +56,35 @@
   }
   #gigbar button[aria-pressed=true]{background:var(--accent); color:#fff; border-color:var(--accent);}
   #gigbar .note{font-size:12px; color:var(--faint); padding:4px 0;}
+
+  /* ---------- Rehearsal / Details ---------- */
+  #subbar{flex:none; display:flex; gap:6px; justify-content:center; padding:6px 14px 0;}
+  #subbar[hidden]{display:none;}
+  #subbar button{
+    padding:6px 16px; border:1px solid var(--line); border-radius:999px;
+    background:var(--panel); color:var(--dim);
+    font-size:13px; font-weight:600; font-family:inherit;
+  }
+  #subbar button[aria-pressed=true]{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+  #details{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    display:none; padding:14px 16px calc(18px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);}
+  body.tab-details #details{display:block;}
+  body.tab-details #whorow,
+  body.tab-details #top,
+  body.tab-details #vp,
+  body.tab-details #bot{display:none;}
+  #details h3{margin:0 0 8px; font-size:12px; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--faint);}
+  #details section{margin:0 0 22px;}
+  #details p{margin:0 0 9px; font-size:14.5px; line-height:1.5; color:var(--ink);}
+  #details a{color:var(--accent2);}
+  #details ol{margin:0; padding-left:1.4em;}
+  #details li{font-size:14.5px; line-height:1.75; color:var(--ink);}
+  #details .play{display:inline-block; padding:11px 18px; border-radius:12px;
+    background:var(--accent); color:#fff; font-size:14.5px; font-weight:650; text-decoration:none;}
+  #details .empty{color:var(--faint); font-size:14px;}
   #maracas{height:34px; width:auto; flex:none; display:block;}
   #maracas[hidden]{display:none;}
   #top{padding:8px 14px 8px; flex:none;}
@@ -179,6 +208,11 @@
   <div id="brand"><img alt="Salsabrosos" src="logo.png" width="418" height="96"></div>
   <div id="gigbar"></div>
 
+  <div id="subbar" hidden>
+    <button data-tab="rehearsal" aria-pressed="true">Rehearsal</button>
+    <button data-tab="details"  aria-pressed="false">Details</button>
+  </div>
+
   <div id="whorow"></div>
 
   <div id="top">
@@ -202,6 +236,8 @@
     <div id="corner"></div>
     <div id="tip"></div>
   </div>
+
+  <div id="details"></div>
 
   <div id="bot">
     <span id="count"></span>
@@ -243,6 +279,17 @@ const CONFIG = {
 let SEED = null;        // responses that arrived with the gig list, if any
 const remember = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
 const recall   = k      => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+
+/* Names introduced on this device via "+ I'm new", per gig. Without this a name
+   only exists while `picked` holds it, so it vanished on refresh or on tapping
+   away — before the person had painted anything there was nothing to come back to. */
+const MINE_KEY = () => "mine:" + (CONFIG.gigId || "");
+const myNames  = () => (recall(MINE_KEY()) || "").split("\n").filter(Boolean);
+function rememberMine(name){
+  const list = myNames();
+  if (!list.some(x => x.trim().toLowerCase() === name.trim().toLowerCase())) list.push(name);
+  remember(MINE_KEY(), list.join("\n"));
+}
 
 function renderGigBar(gigs, currentId){
   const bar = document.getElementById("gigbar");
@@ -289,6 +336,8 @@ async function boot(){
     if (gig.startHour != null) CONFIG.startHour = gig.startHour;
     if (gig.endHour   != null) CONFIG.endHour   = gig.endHour;
     document.title = gig.label + " \u2014 availability";
+    CONFIG.gigData = gig;                      // youtube / setlist / details live here
+    document.getElementById("subbar").hidden = false;
     remember("gig", gig.id);
     renderGigBar(gigs, gig.id);
   } else {
@@ -497,18 +546,15 @@ function knownPeople(){
   const answered = new Map();
   group.forEach(r => answered.set(nkey(r.name), r.name));
   const out = [], seen = new Set();
-  (CONFIG.people || []).forEach(n => {                 // pre-listed, in the Sheet's order
+  const add = n => {
     const k = nkey(n);
     if (!k || seen.has(k)) return;
     seen.add(k);
     out.push({ name: answered.get(k) || n, pending: !answered.has(k) });
-  });
-  group.forEach(r => {                                 // anyone else who has answered
-    const k = nkey(r.name);
-    if (!k || seen.has(k)) return;
-    seen.add(k);
-    out.push({ name: r.name, pending: false });
-  });
+  };
+  (CONFIG.people || []).forEach(add);   // pre-listed on the gig's row in the Sheet
+  myNames().forEach(add);               // introduced here, maybe not submitted yet
+  group.forEach(r => add(r.name));      // anyone who has answered
   return out;
 }
 
@@ -582,6 +628,7 @@ function commitTypedName(){
   if (exact) return selectIdentity(exact.name);             // same person, canonical spelling
   const near = people.filter(x => looksLikeSameName(k, nkey(x.name)));
   if (near.length) return askNearMatch(raw, near);
+  rememberMine(raw);                    // keep the chip even if they never paint a slot
   selectIdentity(raw);
 }
 
@@ -602,7 +649,7 @@ function askNearMatch(typed, near){
   const no = document.createElement("button");
   no.className = "ghost";
   no.textContent = "No \u2014 I'm " + typed;
-  no.onclick = () => { el.hidden = true; selectIdentity(typed); };
+  no.onclick = () => { el.hidden = true; rememberMine(typed); selectIdentity(typed); };
   el.appendChild(no);
   el.hidden = false;
   pendingConfirm = true;
@@ -612,12 +659,52 @@ function askNearMatch(typed, near){
 $("whook").onclick = commitTypedName;
 $("who").addEventListener("keydown", e => { if (e.key === "Enter") commitTypedName(); });
 
+/* ---------- Rehearsal / Details ---------- */
+const esc = t => String(t).replace(/[&<>"]/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+/* Sheet content is escaped before anything is injected, then bare URLs are linked. */
+const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g,
+  '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+function renderDetails(){
+  const el = $("details"), g = CONFIG.gigData || {};
+  const out = [];
+
+  if (g.details){
+    out.push('<section><h3>Gig info</h3>' +
+      String(g.details).split(/\n\s*\n/).map(para =>
+        "<p>" + linkify(para).replace(/\n/g, "<br>") + "</p>").join("") +
+      "</section>");
+  }
+  if (g.setlist && g.setlist.length){
+    out.push('<section><h3>Setlist</h3><ol>' +
+      g.setlist.map(x => "<li>" + esc(x) + "</li>").join("") + "</ol></section>");
+  }
+  if (g.youtube){
+    out.push('<section><h3>Playlist</h3><a class="play" href="' + esc(g.youtube) +
+      '" target="_blank" rel="noopener noreferrer">\u25b6 Open the playlist</a></section>');
+  }
+  el.innerHTML = out.length ? out.join("")
+    : '<p class="empty">No details for this gig yet \u2014 add them in the gig\u2019s row in the Sheet ' +
+      '(the <b>details</b>, <b>setlist</b> and <b>youtube</b> columns).</p>';
+}
+
+function setTab(t){
+  document.body.classList.toggle("tab-details", t === "details");
+  for (const b of $("subbar").children)
+    b.setAttribute("aria-pressed", String(b.dataset.tab === t));
+  hideTip();
+  if (t !== "details") layout();     // #vp had no size while hidden - re-measure
+}
+for (const b of $("subbar").children) b.onclick = () => setTab(b.dataset.tab);
+
 /* ---- views + edit mode ---- */
 let view = "group";
 function setView(v){
   if (editing && v!=="me") stopEditing();
   view = v;
-  document.body.className = v;
+  document.body.classList.remove("group","me");
+  document.body.classList.add(v);
   hideTip(); renderCells(); refreshBar(); setHint();
 }
 function startEditing(){
@@ -932,7 +1019,7 @@ $("mainbtn").onclick = async () => {
   }
 };
 
-renderWho();
+renderWho(); renderDetails();
 
 layout(); setView("group");
 
