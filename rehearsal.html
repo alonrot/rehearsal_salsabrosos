@@ -85,10 +85,10 @@
   #details .play{display:inline-block; padding:11px 18px; border-radius:12px;
     background:var(--accent); color:#fff; font-size:14.5px; font-weight:650; text-decoration:none;}
   #details .empty{color:var(--faint); font-size:14px;}
-  #details .who{margin-top:4px; padding-top:14px; border-top:1px solid var(--line);}
+  #details .who{margin-top:16px;}
   #details .who p{margin:0 0 6px; font-size:13px; line-height:1.6; color:var(--faint);}
   #details .who b{color:var(--dim); font-weight:650;}
-  #details .addme{margin-top:14px;}
+  #details .addme{margin-top:4px; padding-top:14px; border-top:1px solid var(--line);}
   #details .addme button{padding:10px 16px; border:1px dashed var(--line2); border-radius:12px;
     background:transparent; color:var(--ink); font-size:14px; font-weight:600; font-family:inherit;}
   #details #addmeform{display:flex; flex-direction:column; gap:8px; max-width:340px;}
@@ -746,13 +746,6 @@ function renderDetails(){
   if (g.sheets)  links.push(card(g.sheets,  "doc",  ICON_DOC,  "Music sheets"));
   if (links.length) out.push("<section>" + links.join("") + "</section>");
 
-  const who = knownPeople();
-  if (who.length){
-    const named = p => esc(p.name + (p.role ? " (" + p.role + ")" : ""));
-    out.push('<section class="who"><p><b>Confirmed:</b> '
-             + who.map(named).join(", ") + "</p></section>");
-  }
-
   out.push(
     '<section class="addme">' +
       '<button id="addmebtn" type="button">+ Add myself</button>' +
@@ -766,6 +759,13 @@ function renderDetails(){
         '<p id="amMsg"></p>' +
       "</div>" +
     "</section>");
+
+  const who = knownPeople();
+  if (who.length){
+    const named = p => esc(p.name + (p.role ? " (" + p.role + ")" : ""));
+    out.push('<section class="who"><p><b>Confirmed:</b> '
+             + who.map(named).join(", ") + "</p></section>");
+  }
 
   el.innerHTML = out.length ? out.join("")
     : '<p class="empty">No details for this gig yet.</p>';
