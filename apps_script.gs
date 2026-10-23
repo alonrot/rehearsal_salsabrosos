@@ -68,6 +68,24 @@ function setup() {
   return "gigs tab created";
 }
 
+/**
+ * Create the response tab for every active gig that doesn't have one yet.
+ * Run from the editor (Run ▸ newGigTabs) after adding rows to "gigs" — a tab is
+ * otherwise only born on that gig's first submission, which is too late to type
+ * the setlist into columns G/H. Safe to re-run; it never touches an existing tab.
+ */
+function newGigTabs() {
+  const made = [];
+  readGigs_().forEach(function (g) {
+    if (SpreadsheetApp.getActiveSpreadsheet().getSheetByName(g.id)) return;
+    respSheet_(g.id);
+    made.push(g.id);
+  });
+  const msg = made.length ? "created: " + made.join(", ") : "every active gig already has a tab";
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, "newGigTabs", 8);
+  return msg;
+}
+
 function doGet(e) {
   const p = (e && e.parameter) || {};
   const out = { gigs: readGigs_() };
@@ -194,6 +212,9 @@ function respSheet_(gigId) {
   let sh = ss.getSheetByName(gigId);
   if (!sh) {
     sh = ss.insertSheet(gigId);
+    sh.getRange(1, 1, 1, 8).setValues([HEADERS.concat(["", "song", "key"])]);
+    sh.setFrozenRows(1);
+  } else if (!sh.getRange(1, 1).getValue()) {   // a tab someone added by hand
     sh.getRange(1, 1, 1, 8).setValues([HEADERS.concat(["", "song", "key"])]);
     sh.setFrozenRows(1);
   } else {                                      // migrate tabs made before these columns
