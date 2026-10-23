@@ -85,6 +85,9 @@
   #details .play{display:inline-block; padding:11px 18px; border-radius:12px;
     background:var(--accent); color:#fff; font-size:14.5px; font-weight:650; text-decoration:none;}
   #details .empty{color:var(--faint); font-size:14px;}
+  #details .who{margin-top:4px; padding-top:14px; border-top:1px solid var(--line);}
+  #details .who p{margin:0 0 6px; font-size:13px; line-height:1.6; color:var(--faint);}
+  #details .who b{color:var(--dim); font-weight:650;}
   #details h4{margin:14px 0 4px; font-size:14px; font-weight:650; color:var(--ink);}
   #details .kv{display:flex; gap:12px; padding:7px 0; border-bottom:1px solid var(--line);}
   #details .kv .k{flex:0 0 94px; color:var(--faint); font-size:13px; line-height:1.45;}
@@ -355,6 +358,7 @@ async function boot(){
     if (gig.dates && gig.dates.length) CONFIG.dates = gig.dates;
     if (gig.startHour != null) CONFIG.startHour = gig.startHour;
     if (gig.endHour   != null) CONFIG.endHour   = gig.endHour;
+    if (gig.people && gig.people.length) CONFIG.people = gig.people;   // roster + instruments
     document.title = gig.label + " \u2014 availability";
     CONFIG.gigData = gig;                      // youtube / setlist / details live here
     document.getElementById("subbar").hidden = false;
@@ -502,7 +506,7 @@ async function fetchData(){
     if (view==="group") renderCells();
     refreshBar();
     maybeLoadMine();
-    renderWho();                       // someone new may have answered since last poll
+    renderWho(); renderDetails();      // someone new may have answered since last poll
   }catch(err){ setSync(false); }
 }
 let online=null;
@@ -562,6 +566,15 @@ let picked = "", pendingConfirm = false, newMode = false;
 const nkey = x => String(x||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
                   .toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
 
+/* The people column may carry instruments: "Anushka S (lead singer), Daniel N (bass)".
+   Chips only ever use the name, so matching against submitted rows is unaffected. */
+const parsePerson = x => {
+  const m = String(x).match(/^\s*(.+?)\s*\(([^)]*)\)\s*$/);
+  return m ? { name: m[1].trim(), role: m[2].trim() }
+           : { name: String(x).trim(), role: "" };
+};
+const roster = () => (CONFIG.people || []).map(parsePerson).filter(p => p.name);
+
 function knownPeople(){
   const answered = new Map();
   group.forEach(r => answered.set(nkey(r.name), r.name));
@@ -572,7 +585,7 @@ function knownPeople(){
     seen.add(k);
     out.push({ name: answered.get(k) || n, pending: !answered.has(k) });
   };
-  (CONFIG.people || []).forEach(add);   // pre-listed on the gig's row in the Sheet
+  roster().forEach(p => add(p.name));   // pre-listed on the gig's row in the Sheet
   myNames().forEach(add);               // introduced here, maybe not submitted yet
   group.forEach(r => add(r.name));      // anyone who has answered
   return out;
@@ -732,6 +745,21 @@ function renderDetails(){
   if (g.youtube) links.push(card(g.youtube, "play", ICON_PLAY, "Setlist playlist"));
   if (g.sheets)  links.push(card(g.sheets,  "doc",  ICON_DOC,  "Music sheets"));
   if (links.length) out.push("<section>" + links.join("") + "</section>");
+
+  const answered = new Set(group.map(x => nkey(x.name)));
+  const named = p => esc(p.name + (p.role ? " (" + p.role + ")" : ""));
+  const list  = roster();
+  const yes = list.filter(p => answered.has(nkey(p.name)));
+  const no  = list.filter(p => !answered.has(nkey(p.name)));
+  // people who answered but aren't on the roster still count as confirmed
+  group.forEach(x => { if (!list.some(p => nkey(p.name) === nkey(x.name)))
+                         yes.push({ name: x.name, role: "" }); });
+  if (yes.length || no.length){
+    const bits = [];
+    if (yes.length) bits.push("<p><b>Confirmed:</b> " + yes.map(named).join(", ") + "</p>");
+    if (no.length)  bits.push("<p><b>Not yet:</b> "   + no.map(named).join(", ")  + "</p>");
+    out.push('<section class="who">' + bits.join("") + "</section>");
+  }
 
   el.innerHTML = out.length ? out.join("")
     : '<p class="empty">No details for this gig yet.</p>';
@@ -1075,7 +1103,8 @@ layout(); setView("group");
    you get a fully drawn but empty calendar for the length of the responses fetch. */
 (async () => {
   if (SEED){
-    group = SEED; rebuildCounts(); renderCells(); refreshBar(); renderWho(); setSync(true);
+    group = SEED; rebuildCounts(); renderCells(); refreshBar();
+    renderWho(); renderDetails(); setSync(true);
   } else {
     await fetchData();                       // no gig in the link: second trip needed
   }

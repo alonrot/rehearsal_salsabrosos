@@ -41,10 +41,14 @@ never use `people`, or youtube / sheets / details land in the wrong fields.
 - `label` is the button text; rename it freely.
 - `active` unticked hides the button without deleting the answers.
 - `startHour` / `endHour` are optional; blank falls back to the page defaults.
-- `people` is optional: a comma-separated roster. Those names show as buttons
-  immediately (dimmed until that person answers), so you can also see who is
-  still missing. Blank is fine — the buttons then build themselves from whoever
-  has answered.
+- `people` is optional: a comma-separated roster, with instruments in brackets —
+  `Anushka S (lead singer), Daniel N (bass), karl d`. Those names show as buttons
+  immediately (dimmed until that person answers), and Gig Details lists them as
+  **Confirmed** / **Not yet**. Chips use only the name, so the brackets never affect
+  matching against submitted rows. Blank is fine — the buttons then build themselves
+  from whoever has answered.
+  Note `boot()` must copy `gig.people` into `CONFIG.people`; without that line the
+  whole column is silently dead.
 - `youtube`, `sheets`, `details` feed the Gig Details tab — see below.
 
 ## Who are you? / seeing one person's slots
