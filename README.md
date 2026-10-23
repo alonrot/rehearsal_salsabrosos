@@ -29,9 +29,12 @@ The last choice is remembered in `localStorage`.
 
 **The gig list lives in the Sheet**, tab `gigs`:
 
-| id | label | dates | active | startHour | endHour | people |
-|---|---|---|---|---|---|---|
-| `RCR Oct 30` | `RCR Oct 30` | `2026-10-07,2026-10-10,…` | ☑ | 9 | 23 | `Alon MV, Skye, …` |
+| A id | B label | C dates | D active | E startHour | F endHour | G people | H youtube | I sheets | J details |
+|---|---|---|---|---|---|---|---|---|---|
+| `RCR Oct 30` | `RCR Oct 30` | `2026-10-07,…` | ☑ | 9 | 23 | `Alon MV, …` | playlist URL | Drive folder URL | free text |
+
+**The script reads by column position, not by header text.** Leave G in place even if you
+never use `people`, or youtube / sheets / details land in the wrong fields.
 
 - `id` is permanent and also becomes the name of that gig's response tab, so keep it
   simple. Sheets forbids `: \ / ? * [ ]` in tab names.
@@ -42,6 +45,7 @@ The last choice is remembered in `localStorage`.
   immediately (dimmed until that person answers), so you can also see who is
   still missing. Blank is fine — the buttons then build themselves from whoever
   has answered.
+- `youtube`, `sheets`, `details` feed the Gig Details tab — see below.
 
 ## Who are you? / seeing one person's slots
 
@@ -74,11 +78,14 @@ local to that device — other people only see names that have actually been sub
 
 ## Rehearsal / Details
 
-Under the gig row sit two tabs. **Rehearsal** is the availability grid. **Details** is a
-read-only page built from three optional cells on the gig's row: `details` (free text —
-blank lines separate paragraphs, URLs become links), `setlist` (one song per line, use
-Alt+Enter inside the cell) and `youtube` (a playlist URL, rendered as a button). Leave
-them blank and the tab says so. Sheet content is HTML-escaped before rendering.
+Under the gig row sit two tabs, right-aligned: **Gig Details** is the landing view and
+**Rehearsal** is the availability grid. Gig Details is read-only, built from three
+optional cells on the gig's row: `details` (free text —
+a `Label: value` line becomes a spec row, a short bare line becomes a sub-heading, URLs
+linkify), `youtube` (playlist URL) and `sheets` (sheet-music folder URL) — the last two
+rendered as tappable cards. Leave them blank and the tab says there are no details yet.
+Sheet content is HTML-escaped before rendering, and the card icons are inline SVG sized
+in CSS: the `width`/`height` attributes alone let an svg collapse to ~2px in a flex row.
 
 Switching back to Rehearsal re-runs `layout()`, because `#vp` has no measurable size
 while it is `display:none` and the grid geometry is computed from its box.

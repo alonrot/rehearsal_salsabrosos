@@ -58,7 +58,7 @@
   #gigbar .note{font-size:12px; color:var(--faint); padding:4px 0;}
 
   /* ---------- Rehearsal / Details ---------- */
-  #subbar{flex:none; display:flex; gap:6px; justify-content:center; padding:6px 14px 0;}
+  #subbar{flex:none; display:flex; gap:6px; justify-content:flex-end; padding:6px 14px 0;}
   #subbar[hidden]{display:none;}
   #subbar button{
     padding:6px 16px; border:1px solid var(--line); border-radius:999px;
@@ -85,6 +85,26 @@
   #details .play{display:inline-block; padding:11px 18px; border-radius:12px;
     background:var(--accent); color:#fff; font-size:14.5px; font-weight:650; text-decoration:none;}
   #details .empty{color:var(--faint); font-size:14px;}
+  #details h4{margin:14px 0 4px; font-size:14px; font-weight:650; color:var(--ink);}
+  #details .kv{display:flex; gap:12px; padding:7px 0; border-bottom:1px solid var(--line);}
+  #details .kv .k{flex:0 0 94px; color:var(--faint); font-size:13px; line-height:1.45;}
+  #details .kv .v{flex:1; min-width:0; color:var(--ink); font-size:14.5px; line-height:1.45;}
+  #details .card{display:flex; align-items:center; gap:12px; padding:13px 14px; margin:0 0 9px;
+    border:1px solid var(--line2); border-radius:14px; background:var(--panel);
+    text-decoration:none; color:var(--ink);}
+  #details .card:active{background:#1b2338;}
+  #details .card .ico{flex:none; width:38px; height:38px; border-radius:11px;
+    display:flex; align-items:center; justify-content:center;}
+  /* size the icons in CSS: the width/height attributes alone let the svg
+     collapse to ~2px inside the flex container */
+  #details .card .ico svg{flex:none; width:22px; height:22px; display:block;}
+  #details .card .ico.play{color:#e8603c; background:rgba(232,96,60,.14);}
+  #details .card .ico.doc{color:var(--sel);  background:rgba(47,191,113,.14);}
+  #details .card .t{flex:1; min-width:0;}
+  #details .card .t b{display:block; font-size:14.5px; font-weight:650;}
+  #details .card .t small{display:block; font-size:12px; color:var(--faint); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #details .card .go{flex:none; color:var(--faint); font-size:20px; line-height:1;}
   #maracas{height:34px; width:auto; flex:none; display:block;}
   #maracas[hidden]{display:none;}
   #top{padding:8px 14px 8px; flex:none;}
@@ -209,8 +229,8 @@
   <div id="gigbar"></div>
 
   <div id="subbar" hidden>
-    <button data-tab="rehearsal" aria-pressed="true">Rehearsal</button>
-    <button data-tab="details"  aria-pressed="false">Details</button>
+    <button data-tab="details"   aria-pressed="true">Gig Details</button>
+    <button data-tab="rehearsal" aria-pressed="false">Rehearsal</button>
   </div>
 
   <div id="whorow"></div>
@@ -666,27 +686,55 @@ const esc = t => String(t).replace(/[&<>"]/g,
 const linkify = t => esc(t).replace(/(https?:\/\/[^\s<]+)/g,
   '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
 
+const ICON_PLAY = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">'
+  + '<circle cx="12" cy="12" r="10" fill="currentColor" opacity=".2"/>'
+  + '<path d="M10 8.2l6.2 3.8-6.2 3.8V8.2z" fill="currentColor"/></svg>';
+const ICON_DOC = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>'
+  + '<path d="M14 3v5h5"/><path d="M9 13.5h6M9 17h4"/></svg>';
+
+const host = u => { try{ return new URL(u).hostname.replace(/^www\./, ""); }catch(e){ return ""; } };
+
+function card(url, cls, icon, title){
+  return '<a class="card" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">'
+    + '<span class="ico ' + cls + '">' + icon + '</span>'
+    + '<span class="t"><b>' + esc(title) + '</b><small>' + esc(host(url)) + '</small></span>'
+    + '<span class="go">\u203a</span></a>';
+}
+
+/* "Label: value" lines become spec rows; a lone short line becomes a sub-heading. */
+function detailsBlock(text){
+  const out = [];
+  String(text).split("\n").forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    const m = t.match(/^([^:]{1,28}):\s*(.+)$/);
+    if (m && !/^https?$/i.test(m[1])){
+      out.push('<div class="kv"><span class="k">' + esc(m[1].trim()) + '</span>'
+             + '<span class="v">' + linkify(m[2].trim()) + "</span></div>");
+    } else if (t.length <= 32 && t.indexOf(" ") < 0 || /^[A-Z][\w ]{0,24}$/.test(t) && t.indexOf(":") < 0){
+      out.push("<h4>" + esc(t) + "</h4>");
+    } else {
+      out.push("<p>" + linkify(t) + "</p>");
+    }
+  });
+  return out.join("");
+}
+
 function renderDetails(){
   const el = $("details"), g = CONFIG.gigData || {};
   const out = [];
 
-  if (g.details){
-    out.push('<section><h3>Gig info</h3>' +
-      String(g.details).split(/\n\s*\n/).map(para =>
-        "<p>" + linkify(para).replace(/\n/g, "<br>") + "</p>").join("") +
-      "</section>");
-  }
-  if (g.setlist && g.setlist.length){
-    out.push('<section><h3>Setlist</h3><ol>' +
-      g.setlist.map(x => "<li>" + esc(x) + "</li>").join("") + "</ol></section>");
-  }
-  if (g.youtube){
-    out.push('<section><h3>Playlist</h3><a class="play" href="' + esc(g.youtube) +
-      '" target="_blank" rel="noopener noreferrer">\u25b6 Open the playlist</a></section>');
-  }
+  if (g.details) out.push("<section>" + detailsBlock(g.details) + "</section>");
+
+  const links = [];
+  if (g.youtube) links.push(card(g.youtube, "play", ICON_PLAY, "Setlist playlist"));
+  if (g.sheets)  links.push(card(g.sheets,  "doc",  ICON_DOC,  "Music sheets"));
+  if (links.length) out.push("<section>" + links.join("") + "</section>");
+
   el.innerHTML = out.length ? out.join("")
-    : '<p class="empty">No details for this gig yet \u2014 add them in the gig\u2019s row in the Sheet ' +
-      '(the <b>details</b>, <b>setlist</b> and <b>youtube</b> columns).</p>';
+    : '<p class="empty">No details for this gig yet.</p>';
 }
 
 function setTab(t){
@@ -1032,8 +1080,9 @@ layout(); setView("group");
     await fetchData();                       // no gig in the link: second trip needed
   }
   const n = document.getElementById("nojs");
-  if (n) n.remove();
+  if (n) n.remove();          // the loading panel lives inside #vp, so it has to go first
   layout();
+  if (CONFIG.gigData) setTab("details");   // gig details are the landing view
   setInterval(fetchData, CONFIG.pollMs);
   document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) fetchData(); });
 })();

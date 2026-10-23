@@ -4,7 +4,7 @@
  * SHEET LAYOUT
  *   "gigs"        the registry of polls. One row per gig:
  *                   id | label | dates | active | startHour | endHour | people
- *                   | youtube | setlist | details
+ *                   | youtube | sheets | details
  *                 - id      permanent; also becomes the name of that gig's
  *                           response tab, so keep it simple (letters, digits,
  *                           spaces, dashes). Sheets forbids : \ / ? * [ ]
@@ -18,8 +18,8 @@
  *                           name and spell it differently the second time.
  *                           Leave it blank and the buttons build themselves from
  *                           whoever has answered.
- *                 - youtube  OPTIONAL playlist/video URL for the Details tab
- *                 - setlist  OPTIONAL one song per line (Alt+Enter inside the cell)
+ *                 - youtube  OPTIONAL playlist URL - shown as a tappable card
+ *                 - sheets   OPTIONAL sheet-music folder URL - shown as a card
  *                 - details  OPTIONAL free text: venue, address, load-in, dress code.
  *                            Blank lines separate paragraphs; URLs become links.
  *   "<gig id>"    one tab per gig, created on that gig's first submission:
@@ -50,7 +50,7 @@ function setup() {
   if (ss.getSheetByName(GIGS_SHEET)) return "gigs tab already exists — nothing changed";
   const sh = ss.insertSheet(GIGS_SHEET, 0);
   sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "people",
-                "youtube", "setlist", "details"]);
+                "youtube", "sheets", "details"]);
   sh.appendRow([
     "RCR Oct 30",
     "RCR Oct 30",
@@ -120,8 +120,7 @@ function readGigs_() {
     if (rows[i][6]) g.people = String(rows[i][6]).split(",").map(function (x) { return x.trim(); })
                                                   .filter(function (x) { return x; });
     if (rows[i][7]) g.youtube = String(rows[i][7]).trim();
-    if (rows[i][8]) g.setlist = String(rows[i][8]).split("\n").map(function (x) { return x.trim(); })
-                                                  .filter(function (x) { return x; });
+    if (rows[i][8]) g.sheets = String(rows[i][8]).trim();
     if (rows[i][9]) g.details = String(rows[i][9]);
     out.push(g);
   }
