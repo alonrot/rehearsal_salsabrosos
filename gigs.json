@@ -33,7 +33,73 @@
       ],
       "youtube": "https://youtube.com/playlist?list=PLfR9vNF4o4JI&si=XWIvDDMDg5Bgbjaw",
       "details": "Vibe: Social dancing\nVenue: 362 Capp St, San Francisco, CA 94110\n\nSchedule\nLoad-in: 5 PM\nSoundcheck: 7:15\nConcert: 8:30 PM - 10 PM",
-      "sheets": "https://drive.google.com/drive/folders/1ciGjJ5Jw0FzMrgEUfe8iC4DDxDFnEd6o?usp=drive_link"
+      "sheets": "https://drive.google.com/drive/folders/1ciGjJ5Jw0FzMrgEUfe8iC4DDxDFnEd6o?usp=drive_link",
+      "setlist": [
+        {
+          "title": "Llorarás",
+          "note": ""
+        },
+        {
+          "title": "A la loma de Belén",
+          "note": ""
+        },
+        {
+          "title": "Cantante",
+          "note": ""
+        },
+        {
+          "title": "Flor Pálida",
+          "note": ""
+        },
+        {
+          "title": "Sin Documentos",
+          "note": ""
+        },
+        {
+          "title": "Vivir mi vida",
+          "note": ""
+        },
+        {
+          "title": "Yesterday",
+          "note": ""
+        },
+        {
+          "title": "Dancing queen",
+          "note": ""
+        },
+        {
+          "title": "Crazy",
+          "note": ""
+        },
+        {
+          "title": "Shape of You",
+          "note": ""
+        },
+        {
+          "title": "Drivers license",
+          "note": ""
+        },
+        {
+          "title": "Idilio",
+          "note": "A minor"
+        },
+        {
+          "title": "A-Team",
+          "note": ""
+        },
+        {
+          "title": "Love Yourself",
+          "note": ""
+        },
+        {
+          "title": "Todo Tiene Su Final (TTSF)",
+          "note": ""
+        },
+        {
+          "title": "El Cuarto de Tula",
+          "note": "rueda"
+        }
+      ]
     }
   ]
 }

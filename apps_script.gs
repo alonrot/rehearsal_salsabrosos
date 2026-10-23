@@ -3,8 +3,8 @@
  *
  * SHEET LAYOUT
  *   "gigs"        the registry of polls. One row per gig:
- *                   id | label | dates | active | startHour | endHour | people
- *                   | youtube | sheets | details
+ *                   id | label | dates | active | startHour | endHour |
+ *                   (unused) | youtube | sheets | details
  *                 - id      permanent; also becomes the name of that gig's
  *                           response tab, so keep it simple (letters, digits,
  *                           spaces, dashes). Sheets forbids : \ / ? * [ ]
@@ -12,18 +12,18 @@
  *                 - dates   comma-separated ISO dates, e.g. 2026-10-07,2026-10-10
  *                 - active  FALSE (or a checkbox unticked) hides the button
  *                 - startHour / endHour  optional; blank falls back to the page
- *                 - people  OPTIONAL comma-separated roster, e.g. "Alon MV, Skye".
- *                           Those names appear as buttons straight away (dimmed
- *                           until that person answers), so nobody has to type a
- *                           name and spell it differently the second time.
- *                           Leave it blank and the buttons build themselves from
- *                           whoever has answered.
  *                 - youtube  OPTIONAL playlist URL - shown as a tappable card
  *                 - sheets   OPTIONAL sheet-music folder URL - shown as a card
  *                 - details  OPTIONAL free text: venue, address, load-in, dress code.
  *                            Blank lines separate paragraphs; URLs become links.
  *   "<gig id>"    one tab per gig, created on that gig's first submission:
  *                   name | tz | submittedAt | availability_json | instrument
+ *                   | (unused) | song | key
+ *                 Columns G/H are the SETLIST for this gig: one song per row from
+ *                 row 2, H free text (key, "horns out", ...) shown as a dim note.
+ *                 They are independent of the response rows in A:E, which is why
+ *                 doPost() overwrites a row in place and never deletes or appends -
+ *                 either would drag the setlist out of alignment.
  *                 A row is created the moment someone adds themselves on the Gig
  *                 Details tab, before any availability exists. That row IS the
  *                 roster: one record per person per gig, so a name can never be
@@ -53,7 +53,7 @@ function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (ss.getSheetByName(GIGS_SHEET)) return "gigs tab already exists — nothing changed";
   const sh = ss.insertSheet(GIGS_SHEET, 0);
-  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "people",
+  sh.appendRow(["id", "label", "dates", "active", "startHour", "endHour", "",
                 "youtube", "sheets", "details"]);
   sh.appendRow([
     "RCR Oct 30",
@@ -71,7 +71,14 @@ function setup() {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   const out = { gigs: readGigs_() };
-  if (p.what !== "gigs" && p.gig) out.responses = readResponses_(String(p.gig));
+  if (p.what !== "gigs" && p.gig) {
+    const gigId = String(p.gig);
+    const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(gigId);
+    out.responses = sh ? readResponses_(sh) : [];
+    const setlist = sh ? readSetlist_(sh) : [];
+    for (let i = 0; setlist.length && i < out.gigs.length; i++)
+      if (out.gigs[i].id === gigId) { out.gigs[i].setlist = setlist; break; }
+  }
   return json_(out);
 }
 
@@ -87,22 +94,35 @@ function doPost(e) {
     if (!gig) return json_({ error: "gig required" });
 
     const sh = respSheet_(gig);
-    const rows = sh.getDataRange().getValues();
-    // upsert: drop any existing row for this person in THIS gig, then append
-    for (let i = rows.length - 1; i >= 1; i--) {
-      if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) {
-        // a plain availability submit carries no instrument - keep the stored one
-        if (!inst) inst = String(rows[i][4] || "").trim();
-        sh.deleteRow(i + 1);
-      }
+    const last = sh.getLastRow();
+    const rows = last > 1 ? sh.getRange(2, 1, last - 1, 5).getValues() : [];
+
+    // One record per person per gig, overwritten IN PLACE. Never deleteRow() or
+    // appendRow(): the setlist sits in G:H of this same tab and getLastRow()
+    // counts it, so either would misalign the songs or strand the response rows.
+    var row = 0, dupes = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim().toLowerCase() !== name.toLowerCase()) continue;
+      if (row) { dupes.push(i + 2); continue; }
+      // a plain availability submit carries no instrument - keep the stored one
+      if (!inst) inst = String(rows[i][4] || "").trim();
+      row = i + 2;
     }
-    sh.appendRow([
+    if (!row) {                                  // reuse a blank name cell, else grow
+      for (var j = 0; j < rows.length && !row; j++)
+        if (!String(rows[j][0] == null ? "" : rows[j][0]).trim()) row = j + 2;
+      if (!row) row = Math.max(last, 1) + 1;
+    }
+
+    sh.getRange(row, 1, 1, 5).setValues([[
       name,
       p.tz || "",
       p.submittedAt || new Date().toISOString(),
       JSON.stringify(p.availability || {}),
       inst
-    ]);
+    ]]);
+    // older tabs may still carry a duplicate spelling; blank it, don't delete it
+    for (var k = 0; k < dupes.length; k++) sh.getRange(dupes[k], 1, 1, 5).clearContent();
     return json_({ ok: true });
   } catch (err) {
     return json_({ error: String(err) });
@@ -127,8 +147,6 @@ function readGigs_() {
     };
     if (rows[i][4] !== "" && rows[i][4] != null) g.startHour = Number(rows[i][4]);
     if (rows[i][5] !== "" && rows[i][5] != null) g.endHour = Number(rows[i][5]);
-    if (rows[i][6]) g.people = String(rows[i][6]).split(",").map(function (x) { return x.trim(); })
-                                                  .filter(function (x) { return x; });
     if (rows[i][7]) g.youtube = String(rows[i][7]).trim();
     if (rows[i][8]) g.sheets = String(rows[i][8]).trim();
     if (rows[i][9]) g.details = String(rows[i][9]);
@@ -137,10 +155,24 @@ function readGigs_() {
   return out;
 }
 
-function readResponses_(gigId) {
-  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(gigId);
-  if (!sh) return [];                                          // no submissions yet
-  const rows = sh.getDataRange().getValues();
+/** Setlist for one gig: column G = song, column H = key or note, from row 2 down. */
+function readSetlist_(sh) {
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const rows = sh.getRange(2, 7, last - 1, 2).getValues();
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const title = String(rows[i][0] == null ? "" : rows[i][0]).trim();
+    if (!title) continue;
+    out.push({ title: title, note: String(rows[i][1] == null ? "" : rows[i][1]).trim() });
+  }
+  return out;
+}
+
+function readResponses_(sh) {
+  const last = sh.getLastRow();
+  if (last < 2) return [];                        // a hand-made or empty tab
+  const rows = sh.getRange(1, 1, last, 5).getValues();
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     if (!rows[i][0]) continue;
@@ -162,10 +194,12 @@ function respSheet_(gigId) {
   let sh = ss.getSheetByName(gigId);
   if (!sh) {
     sh = ss.insertSheet(gigId);
-    sh.appendRow(HEADERS);
+    sh.getRange(1, 1, 1, 8).setValues([HEADERS.concat(["", "song", "key"])]);
     sh.setFrozenRows(1);
-  } else if (!sh.getRange(1, 5).getValue()) {
-    sh.getRange(1, 5).setValue("instrument");   // migrate a tab made before this column
+  } else {                                      // migrate tabs made before these columns
+    if (!sh.getRange(1, 5).getValue()) sh.getRange(1, 5).setValue("instrument");
+    if (!sh.getRange(1, 7).getValue()) sh.getRange(1, 7).setValue("song");
+    if (!sh.getRange(1, 8).getValue()) sh.getRange(1, 8).setValue("key");
   }
   return sh;
 }

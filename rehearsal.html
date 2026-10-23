@@ -89,6 +89,19 @@
   #details .who p{margin:0 0 6px; font-size:13px; line-height:1.6; color:var(--faint);}
   #details .who b{color:var(--dim); font-weight:650;}
   #details .addme{margin-top:4px; padding-top:14px; border-top:1px solid var(--line);}
+  #details .setlist{border:1px solid var(--line2); border-radius:14px;
+    background:var(--panel); overflow:hidden;}
+  #details .setlist summary{padding:13px 14px; font-size:14.5px; font-weight:650;
+    cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px;}
+  #details .setlist summary::-webkit-details-marker{display:none;}
+  #details .setlist summary::after{content:"\25be"; color:var(--faint); font-size:13px;
+    transition:transform .15s;}
+  #details .setlist[open] summary::after{transform:rotate(180deg);}
+  #details .setlist summary span{color:var(--faint); font-size:12px; font-weight:500;
+    margin-left:auto;}
+  #details .setlist ol{margin:0; padding:8px 14px 12px 34px; border-top:1px solid var(--line);}
+  #details .setlist li{font-size:14px; line-height:1.9; color:var(--ink); padding-left:2px;}
+  #details .setlist li .note{color:var(--faint); font-size:12.5px; white-space:nowrap;}
   #details .addme button{padding:10px 16px; border:1px dashed var(--line2); border-radius:12px;
     background:transparent; color:var(--ink); font-size:14px; font-weight:600; font-family:inherit;}
   #details #addmeform{display:flex; flex-direction:column; gap:8px; max-width:340px;}
@@ -371,7 +384,6 @@ async function boot(){
     if (gig.dates && gig.dates.length) CONFIG.dates = gig.dates;
     if (gig.startHour != null) CONFIG.startHour = gig.startHour;
     if (gig.endHour   != null) CONFIG.endHour   = gig.endHour;
-    if (gig.people && gig.people.length) CONFIG.people = gig.people;   // roster + instruments
     document.title = gig.label + " \u2014 availability";
     CONFIG.gigData = gig;                      // youtube / setlist / details live here
     document.getElementById("subbar").hidden = false;
@@ -745,12 +757,31 @@ function renderDetails(){
   if (g.sheets)  links.push(card(g.sheets,  "doc",  ICON_DOC,  "Music sheets"));
   if (links.length) out.push("<section>" + links.join("") + "</section>");
 
+  const slRows = g.setlist || [];
+  if (slRows.length){
+    const songs = slRows.map(row => {
+      let title = "", note = "";
+      if (row && typeof row === "object") { title = row.title || ""; note = row.note || ""; }
+      else {                                   // tolerate a pre-G/H deployment
+        const m = String(row).match(/^(.*?)\s+[-–—]\s+(.+)$/);
+        if (m) { title = m[1]; note = m[2]; } else title = String(row);
+      }
+      title = String(title).trim(); note = String(note).trim();
+      if (!title) return "";
+      return "<li>" + esc(title)
+           + (note ? ' <span class="note">' + esc(note) + "</span>" : "") + "</li>";
+    }).join("");
+    out.push('<section><details class="setlist" id="slbox"' + (setlistOpen ? " open" : "") + ">"
+      + "<summary>Setlist<span>" + slRows.length + " songs</span></summary>"
+      + "<ol>" + songs + "</ol></details></section>");
+  }
+
   out.push(
     '<section class="addme">' +
       '<button id="addmebtn" type="button">+ Add myself</button>' +
       '<div id="addmeform" hidden>' +
         '<input id="amName" type="text" placeholder="Your name" autocomplete="off" autocapitalize="words">' +
-        '<input id="amInst" type="text" placeholder="Instrument (e.g. trombone)" autocomplete="off">' +
+        '<input id="amInst" type="text" placeholder="Instrument (e.g. trombone, vocals)" autocomplete="off">' +
         '<div class="row2">' +
           '<button id="amSave" type="button">Add me</button>' +
           '<button id="amCancel" type="button" class="ghost">Cancel</button>' +
@@ -772,9 +803,12 @@ function renderDetails(){
 }
 
 /* ---------- add myself ---------- */
-let addOpen = false;
+let addOpen = false, setlistOpen = false;
 
 function wireAddMe(){
+  // the 8s poll re-renders this panel, so the disclosure has to remember itself
+  const sl = $("slbox");
+  if (sl) sl.ontoggle = () => { setlistOpen = sl.open; };
   const btn = $("addmebtn"); if (!btn) return;
   const form = $("addmeform"), msg = $("amMsg");
   const close = () => { addOpen = false; form.hidden = true; btn.hidden = false;
